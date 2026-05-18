@@ -1,6 +1,6 @@
 package com.aiautocreate.data.asset
 
-import com.aiautocreate.domain.pipeline.Asset
+import com.aiautocreate.agent.Asset
 import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.data.repository.AppSettingsRepository
 import okhttp3.OkHttpClient
@@ -32,7 +32,6 @@ class PixabayAssetProvider @Inject constructor(
                 val body = response.body?.string() ?: return@withContext emptyList()
                 val result = json.decodeFromString<PixabayVideoResponse>(body)
                 result.hits.map { video ->
-                    // نأخذ أفضل جودة متاحة
                     val videoUrl = video.videos?.large?.url ?: video.videos?.medium?.url ?: video.videos?.small?.url
                     Asset(
                         id = "pixabay_video_${video.id}",
