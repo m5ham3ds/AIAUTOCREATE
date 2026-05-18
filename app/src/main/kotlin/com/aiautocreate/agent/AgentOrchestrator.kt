@@ -5,9 +5,13 @@ import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.model.AgentInterventionLog
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
+import com.aiautocreate.domain.pipeline.Asset
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.util.UUID
@@ -26,7 +30,7 @@ class AgentOrchestrator @Inject constructor(
     private var maxInterventionDepth: Int = 3
 
     init {
-        kotlinx.coroutines.GlobalScope.launch {
+        CoroutineScope(Dispatchers.IO).launch {
             maxInterventionDepth = settingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
         }
     }
@@ -44,7 +48,6 @@ class AgentOrchestrator @Inject constructor(
         errorMessage: String,
         currentDepth: Int = 1
     ): ModelConfig? {
-        // ... (نفس الكود القديم) ...
         if (currentDepth > maxInterventionDepth) {
             emitEvent(AgentEvent.InterventionSkipped(category, "تم تجاوز عمق التدخل المسموح ($maxInterventionDepth)", currentDepth))
             return null
@@ -64,7 +67,6 @@ class AgentOrchestrator @Inject constructor(
         return selected
     }
 
-    // ✅ دوال الوكيل الإبداعي الجديدة
     suspend fun suggestTransition(prevScene: String, nextScene: String, candidates: List<Asset>): Asset? {
         val prompt = """
             أنت خبير مونتاج فيديو محترف.
@@ -162,6 +164,7 @@ data class AgentInterventionLog(
     val depth: Int
 )
 
+// تم نقل تعريف Asset إلى هنا لتجنب الاعتماد على PipelineOrchestrator
 data class Asset(
     val id: String,
     val name: String,
