@@ -78,7 +78,6 @@ class PipelineOrchestrator @Inject constructor(
     private val agentOrchestrator: AgentOrchestrator,
     private val interventionHandler: AgentInterventionHandler,
     private val okHttpClient: OkHttpClient,
-    // حقن كل مزود على حدة
     private val pexelsProvider: PexelsAssetProvider,
     private val pixabayProvider: PixabayAssetProvider,
     private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
@@ -87,7 +86,6 @@ class PipelineOrchestrator @Inject constructor(
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
-    // تجميع المزودين يدوياً في Set
     private val assetProviders: Set<AssetProvider> = setOf(
         pexelsProvider,
         pixabayProvider,
@@ -148,7 +146,6 @@ class PipelineOrchestrator @Inject constructor(
 
             emitFinalResult(outputFile)
 
-            // حذف الملفات المؤقتة بعد النجاح
             cleanupTempFiles(projectTempDir)
         } catch (e: Exception) {
             if (!cancelled) {
@@ -567,7 +564,6 @@ class PipelineOrchestrator @Inject constructor(
         val useExternalVideo = settingsRepo.getBoolFlag(profilePrefix + "external_video_on", false)
         val useExternalImage = settingsRepo.getBoolFlag(profilePrefix + "external_image_on", false)
 
-        // قراءة ملفات المشاهد
         val imageFiles = scriptsDir.listFiles()
             ?.filter { it.name.startsWith("MSHHD") && it.name.endsWith(".txt") }
             ?.sortedBy { it.name } ?: emptyList()
@@ -576,7 +572,7 @@ class PipelineOrchestrator @Inject constructor(
         val totalDurationMs = ((config.minutes.toIntOrNull() ?: 1) * 60 + (config.seconds.toIntOrNull() ?: 30)) * 1000L
         val perSceneDurationMs = totalDurationMs / maxOf(1, imageFiles.size)
 
-        // المدخلات الأساسية (الصور المولدة)
+        // ✅ استخدام mutableListOf لإمكانية الإضافة لاحقاً
         val inputs = imageFiles.mapIndexed { index, _ ->
             val imgFile = File(imagesDir, "MSHHD${index + 1}_MG.png")
             MontagePlan.MontageInput(
@@ -584,15 +580,14 @@ class PipelineOrchestrator @Inject constructor(
                 type = "image",
                 durationMs = perSceneDurationMs
             )
-        }.filter { it.path.isNotEmpty() }
+        }.filter { it.path.isNotEmpty() }.toMutableList()
 
-        // 1. الانتقالات الذكية (نستخدم OpenVFX أو القيم الافتراضية)
+        // 1. الانتقالات الذكية
         val transitions = if (useTransitions && inputs.size > 1) {
             mutableListOf<MontagePlan.MontageTransition>().apply {
                 for (i in 0 until inputs.size - 1) {
                     val prevScene = sceneDescriptions.getOrElse(i) { "" }
                     val nextScene = sceneDescriptions.getOrElse(i + 1) { "" }
-                    // جلب انتقالات من OpenVFX (أو أي مزود يدعمها)
                     val candidates = fetchAssets(assetProviders, "transition", "", 10)
                     val finalCandidates = if (candidates.isNotEmpty()) candidates else listOf(
                         Asset(id = "fade", name = "تلاشي", command = "fade"),
@@ -627,7 +622,6 @@ class PipelineOrchestrator @Inject constructor(
         // 3. المسارات الصوتية
         val audioTracks = mutableListOf<MontagePlan.MontageAudio>()
 
-        // 3.1 الصوت الرئيسي
         val mainAudioFile = File(audiosDir, "SCRIPTS_SSML_AU.wav")
         if (mainAudioFile.exists()) {
             audioTracks.add(
@@ -642,7 +636,6 @@ class PipelineOrchestrator @Inject constructor(
             )
         }
 
-        // 3.2 الموسيقى الخلفية (جلب من APIs)
         if (useAudioFx) {
             val overallTheme = "موضوع الفيديو: ${config.prompt}"
             val musicCandidates = fetchAssets(assetProviders, "music", overallTheme, 5)
@@ -669,7 +662,6 @@ class PipelineOrchestrator @Inject constructor(
             }
         }
 
-        // 3.3 مؤثرات صوتية لكل مشهد (جلب من APIs)
         if (useAudioFx) {
             for (i in sceneDescriptions.indices) {
                 val sceneDesc = sceneDescriptions[i]
