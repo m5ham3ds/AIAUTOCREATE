@@ -20,11 +20,7 @@ object DatabaseModule {
     fun provideAppDatabase(
         @ApplicationContext context: Context
     ): AppDatabase =
-        Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "aiautocreate.db"
-        )
+        Room.databaseBuilder(context, AppDatabase::class.java, "aiautocreate.db")
             .fallbackToDestructiveMigration()
             .build()
 
@@ -48,5 +44,5 @@ object DatabaseModule {
     @Singleton
     fun provideMediaFileDao(db: AppDatabase): MediaFileDao = db.mediaFileDao()
 
-    // ❌ تم حذف provideSyncLogDao
+    // provideSyncLogDao تم حذفها
 }
