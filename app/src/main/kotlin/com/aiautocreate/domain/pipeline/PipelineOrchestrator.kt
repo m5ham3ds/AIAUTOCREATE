@@ -4,15 +4,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
+import com.aiautocreate.agent.Asset
+import com.aiautocreate.data.asset.FreesoundAssetProvider
+import com.aiautocreate.data.asset.LotsOfSoundsAssetProvider
+import com.aiautocreate.data.asset.OpenVFXAssetProvider
+import com.aiautocreate.data.asset.PexelsAssetProvider
+import com.aiautocreate.data.asset.PixabayAssetProvider
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
 import com.aiautocreate.data.repository.AppSettingsRepository
-import com.aiautocreate.data.asset.PexelsAssetProvider
-import com.aiautocreate.data.asset.PixabayAssetProvider
-import com.aiautocreate.data.asset.LotsOfSoundsAssetProvider
-import com.aiautocreate.data.asset.FreesoundAssetProvider
-import com.aiautocreate.data.asset.OpenVFXAssetProvider
 import com.aiautocreate.domain.model.MontagePlan
 import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.domain.service.FFmpegCommandBuilder
@@ -77,7 +78,7 @@ class PipelineOrchestrator @Inject constructor(
     private val agentOrchestrator: AgentOrchestrator,
     private val interventionHandler: AgentInterventionHandler,
     private val okHttpClient: OkHttpClient,
-    // ✅ حقن كل مزود على حدة (بدلاً من Set)
+    // حقن كل مزود على حدة
     private val pexelsProvider: PexelsAssetProvider,
     private val pixabayProvider: PixabayAssetProvider,
     private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
@@ -86,7 +87,7 @@ class PipelineOrchestrator @Inject constructor(
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
-    // ✅ تجميع المزودين يدوياً في Set
+    // تجميع المزودين يدوياً في Set
     private val assetProviders: Set<AssetProvider> = setOf(
         pexelsProvider,
         pixabayProvider,
@@ -94,6 +95,21 @@ class PipelineOrchestrator @Inject constructor(
         freesoundProvider,
         openVfxProvider
     )
+
+    private val _events = MutableSharedFlow<PipelineEvent>()
+    val events: SharedFlow<PipelineEvent> = _events
+
+    @Volatile
+    private var cancelled = false
+    @Volatile
+    private var hfQuotaExceeded = false
+    private var hfQuotaModel = ""
+    private var hfQuotaStage = ""
+
+    companion object {
+        private const val DEFAULT_NEGATIVE = "lowres, blurry, bad anatomy, deformed, watermark, text, jpeg artifacts, worst quality, low quality, noisy"
+        private const val VOICE_CLONE_OPTION = "استنساخ العينة (من الإعدادات)"
+    }
 
     // ----------------------------------------------
     // 1. دالة التشغيل الرئيسية
@@ -147,7 +163,7 @@ class PipelineOrchestrator @Inject constructor(
     private suspend fun checkCancel(): Boolean = cancelled
 
     // ----------------------------------------------
-    // 2. توليد السيناريو (نفس الكود السابق)
+    // 2. توليد السيناريو
     // ----------------------------------------------
     private suspend fun generateScript(config: PipelineConfig): String {
         try {
@@ -224,7 +240,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 3. توليد الصور (نفس الكود السابق)
+    // 3. توليد الصور
     // ----------------------------------------------
     private suspend fun processImages(config: PipelineConfig, imagesDir: File, scriptsDir: File) {
         if (hfQuotaExceeded) return
@@ -325,7 +341,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 4. توليد الصوت (TTS) – نفس الكود السابق
+    // 4. توليد الصوت (TTS)
     // ----------------------------------------------
     private suspend fun processTts(config: PipelineConfig, audiosDir: File, scriptsDir: File) {
         if (hfQuotaExceeded) return
@@ -420,7 +436,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid) – نفس الكود السابق
+    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid)
     // ----------------------------------------------
     private suspend fun processVideo(config: PipelineConfig, videosDir: File, imagesDir: File, scriptsDir: File) {
         if (hfQuotaExceeded) return
@@ -953,15 +969,6 @@ class PipelineOrchestrator @Inject constructor(
     private suspend fun emitError(stage: String, msg: String) = _events.emit(PipelineEvent.Error(stage, msg))
     private suspend fun emitFinalResult(path: String) = _events.emit(PipelineEvent.FinalResult(path))
 }
-
-// تعريف Asset (يجب أن يكون متطابقاً مع المستخدم في AgentOrchestrator)
-data class Asset(
-    val id: String,
-    val name: String,
-    val command: String? = null,
-    val fileUrl: String? = null,
-    val localPath: String? = null
-)
 
 private suspend fun AppSettingsRepository.getBoolFlag(key: String, default: Boolean): Boolean {
     return try { getStringOnce(key, if (default) "true" else "false").toBoolean() } catch (_: Exception) { default }
