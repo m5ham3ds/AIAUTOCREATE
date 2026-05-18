@@ -13,10 +13,6 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
-/**
- * وحدة حقن مزودي الأصول (Asset Providers) التي تستخدمها PipelineOrchestrator.
- * جميع المزودين يتم تجميعهم في Set<AssetProvider> باستخدام @IntoSet.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object AssetModule {
