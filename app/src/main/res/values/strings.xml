@@ -1,0 +1,75 @@
+<resources>
+    <string name="app_name">AI AutoCreate</string>
+
+    <!-- عناوين الشاشات -->
+    <string name="title_home">الرئيسية</string>
+    <string name="title_settings">الإعدادات</string>
+    <string name="title_models_manager">إدارة النماذج</string>
+    <string name="title_subtitle_style">تنسيق الترجمة</string>
+    <string name="title_ffmpeg">FFmpeg</string>
+    <string name="title_agent_playground">ملعب العمليات</string>
+    <string name="title_video_reimaginer">إعادة تخيل الفيديو</string>
+    <string name="title_similar_video">استخراج فيديو مشابه</string>
+    <string name="title_audio_reconstructor">إعادة بناء الصوت</string>
+    <string name="title_idea_gallery">معرض الأفكار</string>
+    <string name="title_activity_log">سجل النشاطات</string>
+    <string name="title_social_media">منصات التواصل</string>
+    <string name="title_test">الفحوصات</string>
+
+    <!-- الإعدادات -->
+    <string name="language_section">اللغة</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">English</string>
+    <string name="theme_section">السمة</string>
+    <string name="theme_light">فاتح</string>
+    <string name="theme_dark">مظلم</string>
+    <string name="theme_system">النظام</string>
+    <string name="dynamic_color_toggle">الألوان الديناميكية</string>
+    <string name="dynamic_color_description">استخدام ألوان مستوحاة من خلفية الشاشة (Android 12+)</string>
+
+    <!-- القائمة الجانبية -->
+    <string name="drawer_settings">الإعدادات</string>
+    <string name="drawer_models">إدارة النماذج</string>
+    <string name="drawer_subtitle">تنسيق الترجمة</string>
+    <string name="drawer_agent_playground">ملعب العمليات</string>
+    <string name="drawer_video_reimaginer">إعادة تخيل الفيديو</string>
+    <string name="drawer_similar_video">استخراج فيديو مشابه</string>
+    <string name="drawer_audio_reconstructor">إعادة بناء الصوت</string>
+    <string name="drawer_idea_gallery">معرض الأفكار</string>
+    <string name="drawer_activity_log">سجل النشاطات</string>
+    <string name="drawer_social_media">منصات التواصل</string>
+
+    <!-- أزرار -->
+    <string name="btn_save">حفظ</string>
+    <string name="btn_cancel">إلغاء</string>
+    <string name="btn_retry">إعادة المحاولة</string>
+    <string name="btn_ok">حسناً</string>
+    <string name="btn_confirm">موافق</string>
+    <string name="btn_add">إضافة</string>
+    <string name="btn_delete">حذف</string>
+    <string name="btn_generate">توليد</string>
+    <string name="btn_share">مشاركة</string>
+
+    <!-- رسائل -->
+    <string name="msg_loading">جارٍ التحميل…</string>
+    <string name="msg_empty">لا توجد بيانات</string>
+    <string name="msg_error_generic">حدث خطأ غير معروف</string>
+    <string name="msg_project_created">تم إنشاء المشروع بنجاح</string>
+    <string name="msg_video_generated">تم توليد الفيديو بنجاح</string>
+    <string name="msg_save_success">تم الحفظ بنجاح</string>
+    <string name="msg_no_api_keys">لا توجد مفاتيح API محفوظة</string>
+
+    <!-- قنوات الإشعارات -->
+    <string name="channel_video_name">توليد الفيديو</string>
+    <string name="channel_video_desc">إشعارات حالة توليد الفيديو</string>
+    <string name="channel_sync_name">مزامنة البيانات</string>
+    <string name="channel_sync_desc">إشعارات تزامن البيانات مع الخادم</string>
+    <string name="channel_system_name">رسائل النظام</string>
+    <string name="channel_system_desc">إشعارات النظام العامة</string>
+
+    <!-- نصوص الإشعارات -->
+    <string name="notif_video_ready_title">اكتمل توليد الفيديو</string>
+    <string name="notif_video_ready_text">تم إنشاء فيديو \"%1$s\" بنجاح</string>
+    <string name="notif_video_failed_title">فشل توليد الفيديو</string>
+    <string name="notif_video_failed_text">تعذر إنشاء \"%1$s\": %2$s</string>
+</resources>

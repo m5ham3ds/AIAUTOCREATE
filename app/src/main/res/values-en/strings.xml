@@ -1,0 +1,75 @@
+<resources>
+    <string name="app_name">AI AutoCreate</string>
+
+    <!-- Screen Titles -->
+    <string name="title_home">Home</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_models_manager">Model Manager</string>
+    <string name="title_subtitle_style">Subtitle Styles</string>
+    <string name="title_ffmpeg">FFmpeg</string>
+    <string name="title_agent_playground">Agent Playground</string>
+    <string name="title_video_reimaginer">Video Reimaginer</string>
+    <string name="title_similar_video">Similar Video Extraction</string>
+    <string name="title_audio_reconstructor">Audio Reconstructor</string>
+    <string name="title_idea_gallery">Idea Gallery</string>
+    <string name="title_activity_log">Activity Log</string>
+    <string name="title_social_media">Social Media</string>
+    <string name="title_test">Diagnostics</string>
+
+    <!-- Settings -->
+    <string name="language_section">Language</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">English</string>
+    <string name="theme_section">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+    <string name="dynamic_color_toggle">Dynamic Colors</string>
+    <string name="dynamic_color_description">Use colors inspired by your wallpaper (Android 12+)</string>
+
+    <!-- Drawer -->
+    <string name="drawer_settings">Settings</string>
+    <string name="drawer_models">Model Manager</string>
+    <string name="drawer_subtitle">Subtitle Styles</string>
+    <string name="drawer_agent_playground">Agent Playground</string>
+    <string name="drawer_video_reimaginer">Video Reimaginer</string>
+    <string name="drawer_similar_video">Similar Video Extraction</string>
+    <string name="drawer_audio_reconstructor">Audio Reconstructor</string>
+    <string name="drawer_idea_gallery">Idea Gallery</string>
+    <string name="drawer_activity_log">Activity Log</string>
+    <string name="drawer_social_media">Social Media</string>
+
+    <!-- Buttons -->
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_confirm">Confirm</string>
+    <string name="btn_add">Add</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_generate">Generate</string>
+    <string name="btn_share">Share</string>
+
+    <!-- Messages -->
+    <string name="msg_loading">Loading…</string>
+    <string name="msg_empty">No data available</string>
+    <string name="msg_error_generic">An unknown error occurred</string>
+    <string name="msg_project_created">Project created successfully</string>
+    <string name="msg_video_generated">Video generated successfully</string>
+    <string name="msg_save_success">Saved successfully</string>
+    <string name="msg_no_api_keys">No API keys stored</string>
+
+    <!-- Notification Channels -->
+    <string name="channel_video_name">Video Generation</string>
+    <string name="channel_video_desc">Notifications for video generation status</string>
+    <string name="channel_sync_name">Data Sync</string>
+    <string name="channel_sync_desc">Notifications for data synchronization</string>
+    <string name="channel_system_name">System Messages</string>
+    <string name="channel_system_desc">General system notifications</string>
+
+    <!-- Notification Text -->
+    <string name="notif_video_ready_title">Video Generation Complete</string>
+    <string name="notif_video_ready_text">Video \"%1$s\" was created successfully</string>
+    <string name="notif_video_failed_title">Video Generation Failed</string>
+    <string name="notif_video_failed_text">Failed to create \"%1$s\": %2$s</string>
+</resources>

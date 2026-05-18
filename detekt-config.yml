@@ -1,0 +1,68 @@
+# detekt-config.yml – AI AutoCreate
+
+build:
+  maxIssues: 50
+  excludeCorrectable: false
+  weights:
+    complexity: 2
+    formatting: 1
+    style: 2
+    performance: 3
+
+style:
+  MagicNumber:
+    active: true
+    excludes: ['**/test/**', '**/androidTest/**', '**/Color.kt', '**/Dimens.kt']
+  MaxLineLength:
+    active: true
+    maxLineLength: 160
+    excludePackageStatements: true
+    excludeImportStatements: true
+    excludeCommentStatements: false
+  WildcardImport:
+    active: true
+  ForbiddenComment:
+    active: true
+    values: ['FIXME', 'STOPSHIP']
+    allowedPatterns: 'TODO.*'
+  ReturnCount:
+    active: true
+    max: 4
+    excludedFunctions: ['equals']
+  UnusedPrivateMember:
+    active: true
+
+complexity:
+  TooManyFunctions:
+    active: true
+    excludes: ['**/test/**', '**/androidTest/**']
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 10
+  LongMethod:
+    active: true
+    threshold: 60
+    excludes: ['**/test/**']
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+
+performance:
+  SpreadOperator:
+    active: true
+  ForEachOnRange:
+    active: true
+  UnnecessaryTemporaryInstantiation:
+    active: true
+
+formatting:
+  active: true
+  android: true
+  autoCorrect: true
+  NoWildcardImports:
+    active: true
+  NoConsecutiveBlankLines:
+    active: true
+  ParameterListWrapping:
+    active: true
+    maxLineLength: 160

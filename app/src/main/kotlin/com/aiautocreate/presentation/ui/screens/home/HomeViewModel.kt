@@ -1,0 +1,261 @@
+package com.aiautocreate.presentation.ui.screens.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.aiautocreate.AIAutoCreateApp
+import com.aiautocreate.data.repository.AppSettingsRepository
+import com.aiautocreate.domain.pipeline.PipelineConfig
+import com.aiautocreate.domain.pipeline.PipelineEvent
+import com.aiautocreate.domain.pipeline.PipelineOrchestrator
+import com.aiautocreate.domain.repository.IModelsRepository
+import com.aiautocreate.util.NetworkUtils
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val settingsRepo: AppSettingsRepository,
+    private val modelsRepo: IModelsRepository,
+    private val orchestrator: PipelineOrchestrator
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(HomeState())
+    val state: StateFlow<HomeState> = _state.asStateFlow()
+
+    init {
+        loadStylesAndSelections()
+        checkConnection()
+    }
+
+    private fun loadStylesAndSelections() {
+        viewModelScope.launch {
+            try {
+                val imageStyles = getSupportedStylesForCategory("image")
+                val videoStyles = getSupportedStylesForCategory("video")
+                val ttsOptions = getSupportedStylesForCategory("tts")
+                val montageStyles = getMontageStylesFromModels()
+
+                val selImage = settingsRepo.getStringOnce("sel_image_style", imageStyles.firstOrNull() ?: "واقعي")
+                val selCover = settingsRepo.getStringOnce("sel_cover_style", "غلاف بسيط")
+                val selVoice = settingsRepo.getStringOnce("sel_voice", ttsOptions.firstOrNull() ?: "صوت1")
+                val selVideo = settingsRepo.getStringOnce("sel_video_style", videoStyles.firstOrNull() ?: "درامي")
+                val selMontage = settingsRepo.getStringOnce("sel_montage_style", montageStyles.firstOrNull() ?: "قصص وروايات")
+
+                _state.update {
+                    it.copy(
+                        imageStyles = imageStyles.ifEmpty { listOf("واقعي") },
+                        coverStyles = listOf("غلاف بسيط", "غلاف عصري", "غلاف سينمائي"),
+                        videoStyles = videoStyles.ifEmpty { listOf("درامي") },
+                        montageStyles = montageStyles.ifEmpty { listOf("قصص وروايات", "حماسي وجذاب", "احترافية وأنيق", "مخصص") },
+                        voiceOptions = ttsOptions.ifEmpty { listOf("صوت1", "صوت2", "استنساخ العينة") },
+                        selectedImageStyle = selImage,
+                        selectedCoverStyle = selCover,
+                        selectedVoice = selVoice,
+                        selectedVideoStyle = selVideo,
+                        selectedMontageStyle = selMontage,
+                        isLoading = false
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoading = false, errorMessage = "فشل تحميل الإعدادات: ${e.message}") }
+            }
+        }
+    }
+
+    private suspend fun getSupportedStylesForCategory(category: String): List<String> {
+        val allModels = modelsRepo.getAllModelConfigs().first()
+        val enabledModels = allModels.filter { it.isEnabled && it.category.equals(category, ignoreCase = true) }
+        val allStyles = enabledModels.flatMap { it.supportedStyles ?: emptyList() }
+        return allStyles.distinct().sorted()
+    }
+
+    private suspend fun getMontageStylesFromModels(): List<String> {
+        val allModels = modelsRepo.getAllModelConfigs().first()
+        val relevantModels = allModels.filter {
+            it.isEnabled && (it.category.equals("analysis", ignoreCase = true) ||
+                    it.category.equals("text", ignoreCase = true) ||
+                    it.pipelineTag.contains("text-generation", ignoreCase = true))
+        }
+        val styles = relevantModels.flatMap { it.supportedStyles ?: emptyList() }
+        return if (styles.isNotEmpty()) styles.distinct().sorted() else listOf(
+            "قصص وروايات", "حماسي وجذاب", "احترافية وأنيق", "مخصص"
+        )
+    }
+
+    private fun checkConnection() {
+        viewModelScope.launch {
+            val connected = NetworkUtils.isOnline(AIAutoCreateApp.instance)
+            _state.update {
+                it.copy(
+                    isConnected = connected,
+                    connectionStatus = if (connected) "متصل بالخادم الذكي" else "غير متصل بالإنترنت"
+                )
+            }
+        }
+    }
+
+    private suspend fun getMontageProfile(style: String): MontageProfile {
+        val prefix = "profile_${style}_"
+        return MontageProfile(
+            minutes = settingsRepo.getStringOnce("${prefix}minutes", "01").toIntOrNull() ?: 1,
+            seconds = settingsRepo.getStringOnce("${prefix}seconds", "30").toIntOrNull() ?: 30,
+            aspect = settingsRepo.getStringOnce("${prefix}aspect", "16:9"),
+            quality = settingsRepo.getStringOnce("${prefix}quality", "1080p"),
+            fps = settingsRepo.getStringOnce("${prefix}fps", "30"),
+            masterModelEnabled = settingsRepo.getBoolOnce("${prefix}master_on", false),
+            audioFxEnabled = settingsRepo.getBoolOnce("${prefix}audio_on", false),
+            visualFxEnabled = settingsRepo.getBoolOnce("${prefix}visual_on", false),
+            transitionsEnabled = settingsRepo.getBoolOnce("${prefix}trans_on", false),
+            smartCountEnabled = settingsRepo.getBoolOnce("${prefix}smart_on", false),
+            subtitlesEnabled = settingsRepo.getBoolOnce("${prefix}sub_on", false),
+            musicEnabled = settingsRepo.getBoolOnce("${prefix}music_on", false),
+            reviewerEnabled = settingsRepo.getBoolOnce("${prefix}reviewer_on", false),
+            orchestratorEnabled = settingsRepo.getBoolOnce("${prefix}orch_on", false)
+        )
+    }
+
+    private suspend fun AppSettingsRepository.getBoolOnce(key: String, default: Boolean): Boolean {
+        return try {
+            getStringOnce(key, if (default) "true" else "false").toBoolean()
+        } catch (_: Exception) { default }
+    }
+
+    fun onPromptChanged(text: String) {
+        _state.update { it.copy(promptText = text, errorMessage = null) }
+    }
+
+    fun onImageStyleSelected(style: String) {
+        _state.update { it.copy(selectedImageStyle = style) }
+        viewModelScope.launch { settingsRepo.setString("sel_image_style", style) }
+    }
+
+    fun onCoverStyleSelected(style: String) {
+        _state.update { it.copy(selectedCoverStyle = style) }
+        viewModelScope.launch { settingsRepo.setString("sel_cover_style", style) }
+    }
+
+    fun onVoiceSelected(voice: String) {
+        _state.update { it.copy(selectedVoice = voice) }
+        viewModelScope.launch { settingsRepo.setString("sel_voice", voice) }
+    }
+
+    fun onVideoStyleSelected(style: String) {
+        _state.update { it.copy(selectedVideoStyle = style) }
+        viewModelScope.launch { settingsRepo.setString("sel_video_style", style) }
+    }
+
+    fun onMontageStyleSelected(style: String) {
+        _state.update { it.copy(selectedMontageStyle = style) }
+        viewModelScope.launch { settingsRepo.setString("sel_montage_style", style) }
+    }
+
+    fun startProcessing() {
+        val s = _state.value
+        if (s.promptText.isBlank()) {
+            _state.update { it.copy(errorMessage = "الرجاء إدخال نص الفكرة") }
+            return
+        }
+        if (s.isProcessing) return
+
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isProcessing = true,
+                    progress = 0f,
+                    progressText = "0%",
+                    logs = emptyList(),
+                    outputVideoPath = null,
+                    errorMessage = null
+                )
+            }
+
+            try {
+                val profile = getMontageProfile(s.selectedMontageStyle)
+
+                // النماذج الأساسية
+                val sdModel = settingsRepo.getSelectedModelForCategory("image")
+                val img2VidModel = settingsRepo.getSelectedModelForCategory("video")
+                val ttsModel = settingsRepo.getSelectedModelForCategory("tts")
+
+                // ✅ النماذج المتخصصة للمهام المختلفة
+                val masterModelId = settingsRepo.getSelectedModelForCategory("master")
+                val audioFxModelId = settingsRepo.getSelectedModelForCategory("audio_fx")
+                val visualFxModelId = settingsRepo.getSelectedModelForCategory("visual_fx")
+                val transitionsModelId = settingsRepo.getSelectedModelForCategory("transitions")
+                val subtitlesModelId = settingsRepo.getSelectedModelForCategory("subtitles")
+                val musicModelId = settingsRepo.getSelectedModelForCategory("music")
+                val reviewerModelId = settingsRepo.getSelectedModelForCategory("reviewer")
+                val orchestratorModelId = settingsRepo.getSelectedModelForCategory("orchestrator")
+
+                val config = PipelineConfig(
+                    prompt = s.promptText,
+                    imageStyle = s.selectedImageStyle,
+                    coverStyle = s.selectedCoverStyle,
+                    voiceChoice = s.selectedVoice,
+                    videoStyle = s.selectedVideoStyle,
+                    montageStyle = s.selectedMontageStyle,
+                    minutes = profile.minutes.toString(),
+                    seconds = profile.seconds.toString(),
+                    aspect = profile.aspect,
+                    quality = profile.quality,
+                    sdModel = sdModel,
+                    img2VidModel = img2VidModel,
+                    ttsModel = ttsModel,
+                    selectedFps = profile.fps,   // ✅ تمرير FPS إلى PipelineConfig (يجب إضافته في PipelineConfig)
+                    masterModelId = masterModelId,
+                    audioFxModelId = audioFxModelId,
+                    visualFxModelId = visualFxModelId,
+                    transitionsModelId = transitionsModelId,
+                    subtitlesModelId = subtitlesModelId,
+                    musicModelId = musicModelId,
+                    reviewerModelId = reviewerModelId,
+                    orchestratorModelId = orchestratorModelId
+                )
+
+                orchestrator.events.collect { event ->
+                    when (event) {
+                        is PipelineEvent.Progress -> _state.update {
+                            it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
+                        }
+                        is PipelineEvent.Log -> _state.update {
+                            it.copy(logs = it.logs + event.message)
+                        }
+                        is PipelineEvent.Error -> _state.update {
+                            it.copy(errorMessage = event.message, isProcessing = false)
+                        }
+                        is PipelineEvent.FinalResult -> _state.update {
+                            it.copy(outputVideoPath = event.outputFile, isProcessing = false, progress = 1f, progressText = "100%")
+                        }
+                    }
+                }
+
+                orchestrator.execute(config)
+            } catch (e: Exception) {
+                _state.update { it.copy(isProcessing = false, errorMessage = e.message) }
+            }
+        }
+    }
+
+    fun clearError() {
+        _state.update { it.copy(errorMessage = null) }
+    }
+}
+
+data class MontageProfile(
+    val minutes: Int,
+    val seconds: Int,
+    val aspect: String,
+    val quality: String,
+    val fps: String,
+    val masterModelEnabled: Boolean,
+    val audioFxEnabled: Boolean,
+    val visualFxEnabled: Boolean,
+    val transitionsEnabled: Boolean,
+    val smartCountEnabled: Boolean,
+    val subtitlesEnabled: Boolean,
+    val musicEnabled: Boolean,
+    val reviewerEnabled: Boolean,
+    val orchestratorEnabled: Boolean
+)

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سياسة الخصوصية - AI AutoCreate</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 1rem; line-height: 1.8; color: #1C1B1F; }
+        h1 { color: #9C27B0; }
+        h2 { color: #7B1FA2; margin-top: 2rem; }
+        .lang-switch { background: #F3E5F5; padding: 1rem; border-radius: 12px; margin-bottom: 2rem; text-align: center; }
+        button { background: #9C27B0; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 0 8px; }
+        button:hover { background: #7B1FA2; }
+        .ar, .en { display: none; }
+        .ar.active, .en.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="lang-switch">
+        <button onclick="switchLang('ar')">العربية</button>
+        <button onclick="switchLang('en')">English</button>
+    </div>
+
+    <div id="content-ar" class="ar active">
+        <h1>سياسة الخصوصية – AI AutoCreate</h1>
+        <p><strong>آخر تحديث:</strong> 1 يناير 2025</p>
+
+        <h2>1. المعلومات التي نجمعها</h2>
+        <p>لا نقوم بجمع أي معلومات شخصية تعريفية. جميع مشاريع الفيديو والصور والملفات الصوتية تُعالج محلياً على جهازك ولا تُرفع إلى خوادمنا.</p>
+
+        <h2>2. مفاتيح API</h2>
+        <p>مفاتيح Gemini و HuggingFace التي تدخلها تُخزّن بشكل مشفر محلياً على جهازك باستخدام Android KeyStore. لا نشاركها مع أي طرف ثالث.</p>
+
+        <h2>3. تحليلات Firebase</h2>
+        <p>نستخدم Firebase Analytics و Crashlytics لجمع إحصائيات استخدام مجهولة وسجلات الأعطال، دون أي معلومات شخصية. الهدف تحسين أداء التطبيق فقط.</p>
+
+        <h2>4. الأمان</h2>
+        <p>جميع الاتصالات بالإنترنت مشفرة بـ HTTPS مع Certificate Pinning. البيانات الحساسة محمية بتشفير AES-256.</p>
+
+        <h2>5. حقوقك</h2>
+        <p>يمكنك حذف جميع بياناتك من داخل التطبيق (الإعدادات > مسح البيانات). التطبيق لا يحتفظ بنسخ احتياطية سحابية تلقائية.</p>
+
+        <h2>6. الاتصال</h2>
+        <p>للاستفسارات: <a href="mailto:privacy@aiautocreate.app">privacy@aiautocreate.app</a></p>
+    </div>
+
+    <div id="content-en" class="en">
+        <h1>Privacy Policy – AI AutoCreate</h1>
+        <p><strong>Last Updated:</strong> January 1, 2025</p>
+
+        <h2>1. Information We Collect</h2>
+        <p>We do not collect any personally identifiable information. All video projects, images, and audio files are processed locally on your device and are never uploaded to our servers.</p>
+
+        <h2>2. API Keys</h2>
+        <p>The Gemini and HuggingFace API keys you provide are stored encrypted locally on your device using Android KeyStore. We never share them with third parties.</p>
+
+        <h2>3. Firebase Analytics</h2>
+        <p>We use Firebase Analytics and Crashlytics to collect anonymous usage statistics and crash logs, without any personal data. The goal is solely to improve app performance.</p>
+
+        <h2>4. Security</h2>
+        <p>All internet communication is encrypted with HTTPS and Certificate Pinning. Sensitive data is protected with AES-256 encryption.</p>
+
+        <h2>5. Your Rights</h2>
+        <p>You can delete all your data from within the app (Settings > Clear Data). The app does not maintain automatic cloud backups.</p>
+
+        <h2>6. Contact</h2>
+        <p>For inquiries: <a href="mailto:privacy@aiautocreate.app">privacy@aiautocreate.app</a></p>
+    </div>
+
+    <script>
+        function switchLang(lang) {
+            document.querySelectorAll('.ar, .en').forEach(el => el.classList.remove('active'));
+            document.getElementById('content-' + lang).classList.add('active');
+        }
+    </script>
+</body>
+</html>

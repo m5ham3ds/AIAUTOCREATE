@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "328586879128",
+    "project_id": "aiautocreates",
+    "storage_bucket": "aiautocreates.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:328586879128:android:35e9d01cbed66dbbfd30ed",
+        "android_client_info": {
+          "package_name": "com.aiautocreate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApdh0NvjfLZXDMHMhEdJuKuK2PDST4yk4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
