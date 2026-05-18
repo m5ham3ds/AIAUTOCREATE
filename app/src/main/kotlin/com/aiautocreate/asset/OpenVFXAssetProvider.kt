@@ -1,6 +1,6 @@
 package com.aiautocreate.data.asset
 
-import com.aiautocreate.domain.pipeline.Asset
+import com.aiautocreate.agent.Asset
 import com.aiautocreate.domain.service.AssetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,7 +10,6 @@ import javax.inject.Singleton
 @Singleton
 class OpenVFXAssetProvider @Inject constructor() : AssetProvider {
 
-    // قائمة انتقالات مفتوحة المصدر (يمكن توسيعها لاحقاً)
     private val transitions = listOf(
         Asset(id = "openvfx_fade", name = "تلاشي (Fade)", command = "fade"),
         Asset(id = "openvfx_slide_left", name = "انزلاق لليسار", command = "slideleft"),
