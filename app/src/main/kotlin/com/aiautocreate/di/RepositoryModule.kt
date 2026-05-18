@@ -38,13 +38,9 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindSyncRepository(
-        syncRepository: SyncRepository
-    ): ISyncRepository
-
-    @Binds
-    @Singleton
     abstract fun bindCacheRepository(
         cacheRepository: CacheRepository
     ): ICacheRepository
+
+    // ❌ تم إزالة bindSyncRepository لأن SyncRepository غير موجود أو غير مستخدم
 }
