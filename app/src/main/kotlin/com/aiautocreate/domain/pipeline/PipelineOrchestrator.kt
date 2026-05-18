@@ -8,6 +8,11 @@ import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
 import com.aiautocreate.data.repository.AppSettingsRepository
+import com.aiautocreate.data.asset.PexelsAssetProvider
+import com.aiautocreate.data.asset.PixabayAssetProvider
+import com.aiautocreate.data.asset.LotsOfSoundsAssetProvider
+import com.aiautocreate.data.asset.FreesoundAssetProvider
+import com.aiautocreate.data.asset.OpenVFXAssetProvider
 import com.aiautocreate.domain.model.MontagePlan
 import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.domain.service.FFmpegCommandBuilder
@@ -72,24 +77,23 @@ class PipelineOrchestrator @Inject constructor(
     private val agentOrchestrator: AgentOrchestrator,
     private val interventionHandler: AgentInterventionHandler,
     private val okHttpClient: OkHttpClient,
-    private val assetProviders: Set<@JvmSuppressWildcards AssetProvider>,
+    // ✅ حقن كل مزود على حدة (بدلاً من Set)
+    private val pexelsProvider: PexelsAssetProvider,
+    private val pixabayProvider: PixabayAssetProvider,
+    private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
+    private val freesoundProvider: FreesoundAssetProvider,
+    private val openVfxProvider: OpenVFXAssetProvider,
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
-    private val _events = MutableSharedFlow<PipelineEvent>()
-    val events: SharedFlow<PipelineEvent> = _events
-
-    @Volatile
-    private var cancelled = false
-    @Volatile
-    private var hfQuotaExceeded = false
-    private var hfQuotaModel = ""
-    private var hfQuotaStage = ""
-
-    companion object {
-        private const val DEFAULT_NEGATIVE = "lowres, blurry, bad anatomy, deformed, watermark, text, jpeg artifacts, worst quality, low quality, noisy"
-        private const val VOICE_CLONE_OPTION = "استنساخ العينة (من الإعدادات)"
-    }
+    // ✅ تجميع المزودين يدوياً في Set
+    private val assetProviders: Set<AssetProvider> = setOf(
+        pexelsProvider,
+        pixabayProvider,
+        lotsOfSoundsProvider,
+        freesoundProvider,
+        openVfxProvider
+    )
 
     // ----------------------------------------------
     // 1. دالة التشغيل الرئيسية
