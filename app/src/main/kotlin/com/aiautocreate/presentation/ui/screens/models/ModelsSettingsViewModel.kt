@@ -12,6 +12,7 @@ import com.aiautocreate.worker.BackgroundStyleRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay  // ✅ إضافة الاستيراد المفقود
 import javax.inject.Inject
 
 @HiltViewModel
