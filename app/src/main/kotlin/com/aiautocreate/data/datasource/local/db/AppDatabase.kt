@@ -6,22 +6,19 @@ import androidx.room.TypeConverters
 import com.aiautocreate.data.datasource.local.db.dao.*
 import com.aiautocreate.data.datasource.local.db.entities.*
 
-/**
- * قاعدة البيانات المحلية لتطبيق AI AutoCreate.
- */
 @Database(
     entities = [
         ProjectEntity::class,
         ModelConfigEntity::class,
         ActivityLogEntity::class,
         SubtitlePresetEntity::class,
-        MediaFileEntity::class,
-        SyncLogEntity::class
+        MediaFileEntity::class
+        // SyncLogEntity::class تم حذفه
     ],
-    version = 2,  // ✅ تم زيادة رقم الإصدار لتطبيق التغييرات
+    version = 2,
     exportSchema = true
 )
-@TypeConverters(Converters::class)  // ✅ تم إضافة المحولات
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun projectDao(): ProjectDao
@@ -29,9 +26,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun activityLogDao(): ActivityLogDao
     abstract fun subtitlePresetDao(): SubtitlePresetDao
     abstract fun mediaFileDao(): MediaFileDao
-    abstract fun syncLogDao(): SyncLogDao
-
-    companion object {
-        const val DATABASE_NAME = "aiautocreate.db"
-    }
+    // abstract fun syncLogDao(): SyncLogDao تم حذفها
 }
