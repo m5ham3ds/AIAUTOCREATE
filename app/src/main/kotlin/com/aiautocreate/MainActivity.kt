@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment   // ✅ إضافة الاستيراد المفقود
 import android.provider.Settings
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -46,22 +47,18 @@ class MainActivity : ComponentActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModels()
 
-    // مسجل لطلب صلاحيات متعددة
     private val requestMultiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (!allGranted) {
             Timber.w("بعض الصلاحيات لم يتم منحها")
-            // يمكن عرض Snackbar أو Dialog لتوجيه المستخدم
         }
     }
 
-    // مسجل لطلب صلاحية MANAGE_EXTERNAL_STORAGE (Android 11+)
     private val requestManageStorageLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        // بعد العودة من إعدادات التطبيق، تحقق من الصلاحية
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (Environment.isExternalStorageManager()) {
                 Timber.d("تم منح صلاحية MANAGE_EXTERNAL_STORAGE")
@@ -90,7 +87,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // طلب الصلاحيات فور بدء النشاط
         requestPermissionsIfNeeded()
 
         setContent {
@@ -105,7 +101,6 @@ class MainActivity : ComponentActivity() {
                 darkTheme = darkTheme,
                 dynamicColor = state.dynamicColor
             ) {
-                // ضبط ألوان النظام
                 SideEffect {
                     window.statusBarColor = BackgroundMain.toArgb()
                     window.navigationBarColor = BackgroundMain.toArgb()
@@ -127,25 +122,21 @@ class MainActivity : ComponentActivity() {
 
         when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                // Android 13+
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
                 permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
             }
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                // Android 10-12
                 permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
                 permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
             else -> {
-                // Android 9-
                 permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
                 permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
         }
 
-        // طلب صلاحيات التخزين العادية
         val needed = permissionsToRequest.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
@@ -153,9 +144,8 @@ class MainActivity : ComponentActivity() {
             requestMultiplePermissionsLauncher.launch(needed.toTypedArray())
         }
 
-        // طلب صلاحية MANAGE_EXTERNAL_STORAGE بشكل منفصل (Android 11+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!android.os.Environment.isExternalStorageManager()) {
+            if (!Environment.isExternalStorageManager()) {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                 intent.data = Uri.parse("package:$packageName")
                 requestManageStorageLauncher.launch(intent)
@@ -167,6 +157,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
+	
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
