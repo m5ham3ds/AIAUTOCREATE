@@ -1,6 +1,6 @@
 package com.aiautocreate.data.asset
 
-import com.aiautocreate.domain.pipeline.Asset
+import com.aiautocreate.agent.Asset
 import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.data.repository.AppSettingsRepository
 import okhttp3.OkHttpClient
