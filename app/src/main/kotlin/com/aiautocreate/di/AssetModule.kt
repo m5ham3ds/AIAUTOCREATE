@@ -6,39 +6,43 @@ import com.aiautocreate.data.asset.OpenVFXAssetProvider
 import com.aiautocreate.data.asset.PexelsAssetProvider
 import com.aiautocreate.data.asset.PixabayAssetProvider
 import com.aiautocreate.domain.service.AssetProvider
-import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
+/**
+ * وحدة حقن مزودي الأصول (Asset Providers) التي تستخدمها PipelineOrchestrator.
+ * جميع المزودين يتم تجميعهم في Set<AssetProvider> باستخدام @IntoSet.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class AssetModule {
+object AssetModule {
 
-    @Binds
+    @Provides
     @Singleton
     @IntoSet
-    abstract fun bindPexelsAssetProvider(impl: PexelsAssetProvider): AssetProvider
+    fun providePexelsAssetProvider(impl: PexelsAssetProvider): AssetProvider = impl
 
-    @Binds
+    @Provides
     @Singleton
     @IntoSet
-    abstract fun bindPixabayAssetProvider(impl: PixabayAssetProvider): AssetProvider
+    fun providePixabayAssetProvider(impl: PixabayAssetProvider): AssetProvider = impl
 
-    @Binds
+    @Provides
     @Singleton
     @IntoSet
-    abstract fun bindLotsOfSoundsAssetProvider(impl: LotsOfSoundsAssetProvider): AssetProvider
+    fun provideLotsOfSoundsAssetProvider(impl: LotsOfSoundsAssetProvider): AssetProvider = impl
 
-    @Binds
+    @Provides
     @Singleton
     @IntoSet
-    abstract fun bindFreesoundAssetProvider(impl: FreesoundAssetProvider): AssetProvider
+    fun provideFreesoundAssetProvider(impl: FreesoundAssetProvider): AssetProvider = impl
 
-    @Binds
+    @Provides
     @Singleton
     @IntoSet
-    abstract fun bindOpenVFXAssetProvider(impl: OpenVFXAssetProvider): AssetProvider
+    fun provideOpenVFXAssetProvider(impl: OpenVFXAssetProvider): AssetProvider = impl
 }
