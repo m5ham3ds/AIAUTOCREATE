@@ -36,11 +36,11 @@ abstract class RepositoryModule {
         settingsRepository: SettingsRepository
     ): ISettingsRepository
 
-    // ❌ تم حذف bindSyncRepository
-
     @Binds
     @Singleton
     abstract fun bindCacheRepository(
         cacheRepository: CacheRepository
     ): ICacheRepository
+
+    // bindSyncRepository تم حذفها
 }
