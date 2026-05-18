@@ -1,6 +1,6 @@
 package com.aiautocreate.data.asset
 
-import com.aiautocreate.domain.pipeline.Asset
+import com.aiautocreate.agent.Asset
 import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.data.repository.AppSettingsRepository
 import okhttp3.OkHttpClient
@@ -32,7 +32,6 @@ class PexelsAssetProvider @Inject constructor(
                 val body = response.body?.string() ?: return@withContext emptyList()
                 val result = json.decodeFromString<PexelsVideoResponse>(body)
                 result.videos.map { video ->
-                    // نأخذ أول ملف فيديو متاح (عادةً يكون أفضل جودة)
                     val videoFile = video.videoFiles.firstOrNull()
                     Asset(
                         id = "pexels_${video.id}",
@@ -71,23 +70,22 @@ class PexelsAssetProvider @Inject constructor(
         } catch (e: Exception) { emptyList() }
     }
 
-    override suspend fun searchMusic(query: String, limit: Int): List<Asset> = emptyList() // Pexels لا يوفر موسيقى
+    override suspend fun searchMusic(query: String, limit: Int): List<Asset> = emptyList()
     override suspend fun searchSoundEffects(sceneDescription: String, limit: Int): List<Asset> = emptyList()
     override suspend fun getTransitions(limit: Int): List<Asset> = emptyList()
-}
 
-// دوال JSON الداخلية (يمكن نقلها إلى ملف منفصل)
-@Serializable
-internal data class PexelsVideoResponse(val videos: List<PexelsVideo>)
-@Serializable
-internal data class PexelsVideo(val id: Int, val user: PexelsUser?, val videoFiles: List<PexelsVideoFile>)
-@Serializable
-internal data class PexelsVideoFile(val link: String)
-@Serializable
-internal data class PexelsUser(val name: String)
-@Serializable
-internal data class PexelsImageResponse(val photos: List<PexelsPhoto>)
-@Serializable
-internal data class PexelsPhoto(val id: Int, val photographer: String?, val src: PexelsSrc?)
-@Serializable
-internal data class PexelsSrc(val large: String)
+    @Serializable
+    internal data class PexelsVideoResponse(val videos: List<PexelsVideo>)
+    @Serializable
+    internal data class PexelsVideo(val id: Int, val user: PexelsUser?, val videoFiles: List<PexelsVideoFile>)
+    @Serializable
+    internal data class PexelsVideoFile(val link: String)
+    @Serializable
+    internal data class PexelsUser(val name: String)
+    @Serializable
+    internal data class PexelsImageResponse(val photos: List<PexelsPhoto>)
+    @Serializable
+    internal data class PexelsPhoto(val id: Int, val photographer: String?, val src: PexelsSrc?)
+    @Serializable
+    internal data class PexelsSrc(val large: String)
+}
