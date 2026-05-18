@@ -9,6 +9,7 @@ import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
 import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.model.MontagePlan
+import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.domain.service.FFmpegCommandBuilder
 import com.aiautocreate.util.FFmpegRunner
 import kotlinx.coroutines.*
@@ -71,6 +72,7 @@ class PipelineOrchestrator @Inject constructor(
     private val agentOrchestrator: AgentOrchestrator,
     private val interventionHandler: AgentInterventionHandler,
     private val okHttpClient: OkHttpClient,
+    private val assetProviders: Set<@JvmSuppressWildcards AssetProvider>,
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
@@ -141,7 +143,7 @@ class PipelineOrchestrator @Inject constructor(
     private suspend fun checkCancel(): Boolean = cancelled
 
     // ----------------------------------------------
-    // 2. توليد السيناريو
+    // 2. توليد السيناريو (نفس الكود السابق)
     // ----------------------------------------------
     private suspend fun generateScript(config: PipelineConfig): String {
         try {
@@ -218,7 +220,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 3. توليد الصور
+    // 3. توليد الصور (نفس الكود السابق)
     // ----------------------------------------------
     private suspend fun processImages(config: PipelineConfig, imagesDir: File, scriptsDir: File) {
         if (hfQuotaExceeded) return
@@ -319,7 +321,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 4. توليد الصوت (TTS)
+    // 4. توليد الصوت (TTS) – نفس الكود السابق
     // ----------------------------------------------
     private suspend fun processTts(config: PipelineConfig, audiosDir: File, scriptsDir: File) {
         if (hfQuotaExceeded) return
@@ -414,7 +416,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid)
+    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid) – نفس الكود السابق
     // ----------------------------------------------
     private suspend fun processVideo(config: PipelineConfig, videosDir: File, imagesDir: File, scriptsDir: File) {
         if (hfQuotaExceeded) return
@@ -497,7 +499,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 6. تجميع الفيديو النهائي
+    // 6. تجميع الفيديو النهائي (مع AssetProvider)
     // ----------------------------------------------
     private suspend fun assembleWithMontagePlan(
         config: PipelineConfig,
@@ -564,22 +566,21 @@ class PipelineOrchestrator @Inject constructor(
             )
         }.filter { it.path.isNotEmpty() }
 
-        // 1. الانتقالات الذكية
+        // 1. الانتقالات الذكية (نستخدم OpenVFX أو القيم الافتراضية)
         val transitions = if (useTransitions && inputs.size > 1) {
             mutableListOf<MontagePlan.MontageTransition>().apply {
                 for (i in 0 until inputs.size - 1) {
                     val prevScene = sceneDescriptions.getOrElse(i) { "" }
                     val nextScene = sceneDescriptions.getOrElse(i + 1) { "" }
-                    val suggestedTransition = agentOrchestrator.suggestTransition(
-                        prevScene = prevScene,
-                        nextScene = nextScene,
-                        candidates = listOf(
-                            Asset(id = "fade", name = "تلاشي", command = "fade"),
-                            Asset(id = "slide", name = "انزلاق", command = "slide"),
-                            Asset(id = "wipe", name = "مسح", command = "wipe"),
-                            Asset(id = "zoom", name = "تكبير", command = "zoom")
-                        )
+                    // جلب انتقالات من OpenVFX (أو أي مزود يدعمها)
+                    val candidates = fetchAssets(assetProviders, "transition", "", 10)
+                    val finalCandidates = if (candidates.isNotEmpty()) candidates else listOf(
+                        Asset(id = "fade", name = "تلاشي", command = "fade"),
+                        Asset(id = "slide", name = "انزلاق", command = "slide"),
+                        Asset(id = "wipe", name = "مسح", command = "wipe"),
+                        Asset(id = "zoom", name = "تكبير", command = "zoom")
                     )
+                    val suggestedTransition = agentOrchestrator.suggestTransition(prevScene, nextScene, finalCandidates)
                     val transType = suggestedTransition?.command ?: "fade"
                     add(MontagePlan.MontageTransition(fromIndex = i, toIndex = i + 1, type = transType, durationMs = 500L))
                     emitLog("الوكيل: تم اختيار انتقال '$transType' بين المشهد ${i+1} و ${i+2}")
@@ -621,41 +622,43 @@ class PipelineOrchestrator @Inject constructor(
             )
         }
 
-        // 3.2 الموسيقى الخلفية (عبر الوكيل)
+        // 3.2 الموسيقى الخلفية (جلب من APIs)
         if (useAudioFx) {
             val overallTheme = "موضوع الفيديو: ${config.prompt}"
-            val musicCandidates = listOf(
-                Asset(id = "music1", name = "موسيقى هادئة", fileUrl = "https://example.com/peaceful.mp3"),
-                Asset(id = "music2", name = "موسيقى حماسية", fileUrl = "https://example.com/epic.mp3")
-            )
-            val suggestedMusic = agentOrchestrator.suggestMusic(overallTheme, sceneDescriptions, musicCandidates)
-            if (suggestedMusic != null && suggestedMusic.fileUrl != null) {
-                val localPath = downloadAssetIfNeeded(suggestedMusic)
-                if (localPath != null) {
-                    audioTracks.add(
-                        MontagePlan.MontageAudio(
-                            path = localPath,
-                            startMs = 0L,
-                            durationMs = totalDurationMs,
-                            volume = 0.5,
-                            fadeInMs = 2000,
-                            fadeOutMs = 3000
+            val musicCandidates = fetchAssets(assetProviders, "music", overallTheme, 5)
+            if (musicCandidates.isNotEmpty()) {
+                val suggestedMusic = agentOrchestrator.suggestMusic(overallTheme, sceneDescriptions, musicCandidates)
+                if (suggestedMusic != null && suggestedMusic.fileUrl != null) {
+                    val localPath = downloadAssetIfNeeded(suggestedMusic)
+                    if (localPath != null) {
+                        audioTracks.add(
+                            MontagePlan.MontageAudio(
+                                path = localPath,
+                                startMs = 0L,
+                                durationMs = totalDurationMs,
+                                volume = 0.5,
+                                fadeInMs = 2000,
+                                fadeOutMs = 3000
+                            )
                         )
-                    )
-                    emitLog("الوكيل: تم اختيار الموسيقى الخلفية '${suggestedMusic.name}'")
+                        emitLog("الوكيل: تم اختيار الموسيقى الخلفية '${suggestedMusic.name}' من مصدر خارجي")
+                    }
                 }
+            } else {
+                emitLog("لا توجد موسيقى متاحة من الـ APIs")
             }
         }
 
-        // 3.3 مؤثرات صوتية لكل مشهد
+        // 3.3 مؤثرات صوتية لكل مشهد (جلب من APIs)
         if (useAudioFx) {
             for (i in sceneDescriptions.indices) {
                 val sceneDesc = sceneDescriptions[i]
-                val sfxCandidates = listOf(
-                    Asset(id = "sfx_wind", name = "رياح", fileUrl = "https://example.com/wind.mp3"),
-                    Asset(id = "sfx_door", name = "باب", fileUrl = "https://example.com/door.mp3")
-                )
-                val suggestedSfx = agentOrchestrator.suggestSoundEffects(sceneDesc, sfxCandidates)
+                val sfxCandidates = fetchAssets(assetProviders, "sfx", sceneDesc, 3)
+                val suggestedSfx = if (sfxCandidates.isNotEmpty()) {
+                    agentOrchestrator.suggestSoundEffects(sceneDesc, sfxCandidates)
+                } else {
+                    emptyList()
+                }
                 suggestedSfx.forEach { sfx ->
                     val localPath = downloadAssetIfNeeded(sfx)
                     if (localPath != null) {
@@ -669,20 +672,57 @@ class PipelineOrchestrator @Inject constructor(
                                 fadeOutMs = 500
                             )
                         )
-                        emitLog("الوكيل: تم إضافة مؤثر صوتي '${sfx.name}' للمشهد ${i+1}")
+                        emitLog("الوكيل: تم إضافة مؤثر صوتي '${sfx.name}' للمشهد ${i+1} من مصدر خارجي")
                     }
                 }
             }
         }
 
-        // 4. عناصر خارجية (فيديوهات، صور) – قابلة للتوسع
+        // 4. عناصر خارجية (فيديوهات، صور) – جلب من APIs
         if (useExternalVideo) {
-            // مثال: يمكن إضافة فيديو قصير من Pexels كتراكب أو كمدخل إضافي
-            // سيتم تنفيذه لاحقاً عند دمج API حقيقي
-            emitLog("ميزة الفيديوهات الخارجية مفعلة – سيتم دمجها قريباً")
+            val videoQuery = config.prompt.take(50)
+            val videoAssets = fetchAssets(assetProviders, "video", videoQuery, 2)
+            if (videoAssets.isNotEmpty()) {
+                val firstVideo = videoAssets.first()
+                val localPath = downloadAssetIfNeeded(firstVideo)
+                if (localPath != null) {
+                    inputs.add(
+                        MontagePlan.MontageInput(
+                            path = localPath,
+                            type = "video",
+                            durationMs = perSceneDurationMs
+                        )
+                    )
+                    emitLog("تم إضافة فيديو خارجي '${firstVideo.name}' من المصدر")
+                }
+            } else {
+                emitLog("لم يتم العثور على فيديوهات خارجية مناسبة")
+            }
         }
+
         if (useExternalImage) {
-            emitLog("ميزة الصور الخارجية مفعلة – سيتم دمجها قريباً")
+            val imageQuery = config.prompt.take(50)
+            val imageAssets = fetchAssets(assetProviders, "image", imageQuery, 2)
+            if (imageAssets.isNotEmpty()) {
+                val firstImage = imageAssets.first()
+                val localPath = downloadAssetIfNeeded(firstImage)
+                if (localPath != null) {
+                    overlays.add(
+                        MontagePlan.MontageOverlay(
+                            type = "image",
+                            content = localPath,
+                            startMs = 0,
+                            durationMs = totalDurationMs,
+                            position = "center",
+                            fontSize = 0,
+                            fontColor = ""
+                        )
+                    )
+                    emitLog("تم إضافة صورة خارجية '${firstImage.name}' كتراكب")
+                }
+            } else {
+                emitLog("لم يتم العثور على صور خارجية مناسبة")
+            }
         }
 
         val targetSize = computeTargetSize(config.aspect, config.quality)
@@ -708,6 +748,34 @@ class PipelineOrchestrator @Inject constructor(
     // ----------------------------------------------
     // 7. دوال مساعدة للأصول والذاكرة المؤقتة
     // ----------------------------------------------
+    private suspend fun fetchAssets(
+        providers: Set<AssetProvider>,
+        type: String,
+        query: String,
+        limit: Int
+    ): List<Asset> {
+        for (provider in providers) {
+            val assets = try {
+                when (type) {
+                    "video" -> provider.searchVideos(query, limit)
+                    "image" -> provider.searchImages(query, limit)
+                    "music" -> provider.searchMusic(query, limit)
+                    "sfx" -> provider.searchSoundEffects(query, limit)
+                    "transition" -> provider.getTransitions(limit)
+                    else -> emptyList()
+                }
+            } catch (e: Exception) {
+                emitLog("خطأ في مزود الأصول ${provider::class.simpleName}: ${e.message}")
+                emptyList()
+            }
+            if (assets.isNotEmpty()) {
+                emitLog("تم جلب ${assets.size} عنصر من نوع $type من ${provider::class.simpleName}")
+                return assets
+            }
+        }
+        return emptyList()
+    }
+
     private suspend fun downloadAssetIfNeeded(asset: Asset): String? {
         val url = asset.fileUrl ?: return null
         val fileName = asset.id + "_" + url.substringAfterLast("/")
