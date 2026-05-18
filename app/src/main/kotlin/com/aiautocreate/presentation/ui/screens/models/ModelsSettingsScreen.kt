@@ -18,12 +18,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiautocreate.R
 import com.aiautocreate.presentation.common.components.*
 import com.aiautocreate.presentation.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelsSettingsScreen(
     onMenuClick: () -> Unit,
@@ -57,7 +60,6 @@ fun ModelsSettingsScreen(
             DynamicModelSelectionSection(state, viewModel)
             Spacer(modifier = Modifier.height(Spacing.md))
 
-            // ✅ قسم الاستنساخ الصوتي – يظهر فقط إذا تم اختيار نموذج TTS
             if (state.selectedModels["tts"]?.isNotEmpty() == true) {
                 VoiceCloneSection(state, viewModel)
                 Spacer(modifier = Modifier.height(Spacing.md))
@@ -83,6 +85,7 @@ fun ModelsSettingsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettingsViewModel) {
     Box(
@@ -121,6 +124,7 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
                 visualTransformation = PasswordVisualTransformation()
             )
             Spacer(modifier = Modifier.height(Spacing.md))
+
             OutlinedTextField(
                 value = state.geminiUrl,
                 onValueChange = { viewModel.onGeminiUrlChanged(it) },
@@ -129,6 +133,7 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(Spacing.md))
+
             OutlinedTextField(
                 value = state.huggingFaceToken,
                 onValueChange = { viewModel.onHuggingFaceTokenChanged(it) },
@@ -138,6 +143,7 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
                 visualTransformation = PasswordVisualTransformation()
             )
             Spacer(modifier = Modifier.height(Spacing.md))
+
             OutlinedTextField(
                 value = state.ttsUrl,
                 onValueChange = { viewModel.onTtsUrlChanged(it) },
@@ -146,6 +152,7 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(Spacing.md))
+
             OutlinedTextField(
                 value = state.ffmpegPath,
                 onValueChange = { viewModel.onFfmpegPathChanged(it) },
@@ -154,6 +161,7 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(Spacing.md))
+
             OutlinedTextField(
                 value = state.elevenLabsApiKey,
                 onValueChange = { viewModel.onElevenLabsKeyChanged(it) },
@@ -161,62 +169,61 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-            
-            // ... بعد حقل ElevenLabsApiKey
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.lotsofsoundsApiKey,
-    onValueChange = { viewModel.onLotsOfSoundsKeyChanged(it) },
-    label = { Text("Lots of Sounds API Key") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = true,
-    visualTransformation = PasswordVisualTransformation()
-)
-Spacer(modifier = Modifier.height(Spacing.md))
+            OutlinedTextField(
+                value = state.lotsofsoundsApiKey,
+                onValueChange = { viewModel.onLotsOfSoundsKeyChanged(it) },
+                label = { Text("Lots of Sounds API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.openVfxApiKey,
-    onValueChange = { viewModel.onOpenVfxKeyChanged(it) },
-    label = { Text("OpenVFX API Key") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = true,
-    visualTransformation = PasswordVisualTransformation()
-)
-Spacer(modifier = Modifier.height(Spacing.md))
+            OutlinedTextField(
+                value = state.openVfxApiKey,
+                onValueChange = { viewModel.onOpenVfxKeyChanged(it) },
+                label = { Text("OpenVFX API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.pixabayApiKey,
-    onValueChange = { viewModel.onPixabayKeyChanged(it) },
-    label = { Text("Pixabay API Key") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = true,
-    visualTransformation = PasswordVisualTransformation()
-)
-Spacer(modifier = Modifier.height(Spacing.md))
+            OutlinedTextField(
+                value = state.pixabayApiKey,
+                onValueChange = { viewModel.onPixabayKeyChanged(it) },
+                label = { Text("Pixabay API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.pexelsApiKey,
-    onValueChange = { viewModel.onPexelsKeyChanged(it) },
-    label = { Text("Pexels API Key") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = true,
-    visualTransformation = PasswordVisualTransformation()
-)
-Spacer(modifier = Modifier.height(Spacing.md))
+            OutlinedTextField(
+                value = state.pexelsApiKey,
+                onValueChange = { viewModel.onPexelsKeyChanged(it) },
+                label = { Text("Pexels API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.freesoundApiKey,
-    onValueChange = { viewModel.onFreesoundKeyChanged(it) },
-    label = { Text("Freesound API Key") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = true,
-    visualTransformation = PasswordVisualTransformation()
-)
-
+            OutlinedTextField(
+                value = state.freesoundApiKey,
+                onValueChange = { viewModel.onFreesoundKeyChanged(it) },
+                label = { Text("Freesound API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DynamicModelSelectionSection(state: ModelsSettingsState, viewModel: ModelsSettingsViewModel) {
     val categories = listOf(
