@@ -6,33 +6,39 @@ import com.aiautocreate.data.asset.OpenVFXAssetProvider
 import com.aiautocreate.data.asset.PexelsAssetProvider
 import com.aiautocreate.data.asset.PixabayAssetProvider
 import com.aiautocreate.domain.service.AssetProvider
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object AssetModule {
+abstract class AssetModule {
 
-    @Provides
+    @Binds
     @Singleton
-    fun providePexelsAssetProvider(impl: PexelsAssetProvider): AssetProvider = impl
+    @IntoSet
+    abstract fun bindPexelsAssetProvider(impl: PexelsAssetProvider): AssetProvider
 
-    @Provides
+    @Binds
     @Singleton
-    fun providePixabayAssetProvider(impl: PixabayAssetProvider): AssetProvider = impl
+    @IntoSet
+    abstract fun bindPixabayAssetProvider(impl: PixabayAssetProvider): AssetProvider
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideLotsOfSoundsAssetProvider(impl: LotsOfSoundsAssetProvider): AssetProvider = impl
+    @IntoSet
+    abstract fun bindLotsOfSoundsAssetProvider(impl: LotsOfSoundsAssetProvider): AssetProvider
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideFreesoundAssetProvider(impl: FreesoundAssetProvider): AssetProvider = impl
+    @IntoSet
+    abstract fun bindFreesoundAssetProvider(impl: FreesoundAssetProvider): AssetProvider
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideOpenVFXAssetProvider(impl: OpenVFXAssetProvider): AssetProvider = impl
+    @IntoSet
+    abstract fun bindOpenVFXAssetProvider(impl: OpenVFXAssetProvider): AssetProvider
 }
