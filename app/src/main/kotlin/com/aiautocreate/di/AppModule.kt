@@ -1,38 +1,59 @@
 package com.aiautocreate.di
 
-import com.aiautocreate.data.asset.FreesoundAssetProvider
-import com.aiautocreate.data.asset.LotsOfSoundsAssetProvider
-import com.aiautocreate.data.asset.OpenVFXAssetProvider
-import com.aiautocreate.data.asset.PexelsAssetProvider
-import com.aiautocreate.data.asset.PixabayAssetProvider
-import com.aiautocreate.domain.service.AssetProvider
-import dagger.Binds
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStoreFile
+import com.aiautocreate.data.datasource.local.datastore.DataStoreManager
+import com.aiautocreate.data.datasource.local.secure.ApiKeyMigration
+import com.aiautocreate.data.datasource.local.secure.SecureStorageManager
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.serialization.json.Json
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class AssetModule {
+object AppModule {
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindPexelsAssetProvider(provider: PexelsAssetProvider): AssetProvider
+    fun provideJson(): Json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+        encodeDefaults = true
+        prettyPrint = false
+    }
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindPixabayAssetProvider(provider: PixabayAssetProvider): AssetProvider
+    fun provideDataStore(
+        @ApplicationContext context: Context
+    ): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create {
+            context.preferencesDataStoreFile("aiautocreate_settings")
+        }
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindLotsOfSoundsAssetProvider(provider: LotsOfSoundsAssetProvider): AssetProvider
+    fun provideDataStoreManager(
+        dataStore: DataStore<Preferences>
+    ): DataStoreManager = DataStoreManager(dataStore)
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindFreesoundAssetProvider(provider: FreesoundAssetProvider): AssetProvider
+    fun provideApplicationContext(
+        @ApplicationContext context: Context
+    ): Context = context
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindOpenVFXAssetProvider(provider: OpenVFXAssetProvider): AssetProvider
+    fun provideApiKeyMigration(
+        secureStorageManager: SecureStorageManager
+    ): ApiKeyMigration = ApiKeyMigration(secureStorageManager)
 }
