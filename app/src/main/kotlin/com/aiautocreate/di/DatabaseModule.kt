@@ -25,7 +25,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "aiautocreate.db"
         )
-            .fallbackToDestructiveMigration() // سيتم استبداله بـ Migration حقيقية لاحقاً
+            .fallbackToDestructiveMigration()
             .build()
 
     @Provides
@@ -48,7 +48,5 @@ object DatabaseModule {
     @Singleton
     fun provideMediaFileDao(db: AppDatabase): MediaFileDao = db.mediaFileDao()
 
-    @Provides
-    @Singleton
-    fun provideSyncLogDao(db: AppDatabase): SyncLogDao = db.syncLogDao()
+    // ❌ تم إزالة provideSyncLogDao نهائياً
 }
