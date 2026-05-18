@@ -48,5 +48,5 @@ object DatabaseModule {
     @Singleton
     fun provideMediaFileDao(db: AppDatabase): MediaFileDao = db.mediaFileDao()
 
-    // ❌ تم إزالة provideSyncLogDao نهائياً
+    // ❌ تم حذف provideSyncLogDao
 }
