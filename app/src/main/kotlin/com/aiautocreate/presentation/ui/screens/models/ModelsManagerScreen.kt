@@ -26,12 +26,14 @@ import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.presentation.common.components.*
 import com.aiautocreate.presentation.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelsManagerScreen(
     onMenuClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ModelsManagerViewModel = hiltViewModel()
 ) {
+
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf("active") }
 
