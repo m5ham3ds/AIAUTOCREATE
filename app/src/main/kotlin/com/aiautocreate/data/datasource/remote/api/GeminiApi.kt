@@ -1,15 +1,14 @@
 package com.aiautocreate.data.datasource.remote.api
 
+import com.aiautocreate.data.datasource.remote.dto.request.Content
 import com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto
+import com.aiautocreate.data.datasource.remote.dto.request.Part
 import com.aiautocreate.data.datasource.remote.dto.response.GeminiResponseDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-/**
- * واجهة REST للتفاعل مع Gemini API (Google Generative Language).
- */
 interface GeminiApi {
 
     @POST("v1beta/models/gemini-2.0-flash:generateContent")
@@ -38,9 +37,9 @@ interface GeminiApi {
 suspend fun GeminiApi.generateText(prompt: String): String? {
     val request = GeminiRequestDto(
         contents = listOf(
-            mapOf(
-                "parts" to listOf(
-                    mapOf("text" to prompt)
+            Content(
+                parts = listOf(
+                    Part(text = prompt)
                 )
             )
         )
