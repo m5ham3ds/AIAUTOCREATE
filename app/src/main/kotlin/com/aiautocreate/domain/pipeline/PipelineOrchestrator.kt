@@ -808,7 +808,7 @@ class PipelineOrchestrator @Inject constructor(
                 emitLog("تم تحميل العنصر: ${cachedFile.absolutePath}")
                 cachedFile.absolutePath
             } else {
-                emitLog("فشل تحميل العنصر: ${asset.name} (${response.code()})")
+                emitLog("فشل تحميل العنصر: ${asset.name} (${response.code})")
                 null
             }
         } catch (e: Exception) {
