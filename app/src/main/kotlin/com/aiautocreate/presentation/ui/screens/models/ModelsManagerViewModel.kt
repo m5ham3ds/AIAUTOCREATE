@@ -57,12 +57,10 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    // ✅ دالة جديدة لتحديث النموذج (مستخدمة في حوار الإعدادات)
-    fun updateModel(model: ModelConfig) {
-        viewModelScope.launch {
-            manageModelsUseCase.updateModel(model)
-            loadModels() // إعادة تحميل القائمة بعد التحديث
-        }
+    // ✅ دالة تحديث النموذج (مستخدمة في حوار الإعدادات)
+    suspend fun updateModel(model: ModelConfig) {
+        manageModelsUseCase.updateModel(model)
+        loadModels() // إعادة تحميل القائمة بعد التحديث
     }
 
     // ==================== دوال إضافة النموذج ====================
