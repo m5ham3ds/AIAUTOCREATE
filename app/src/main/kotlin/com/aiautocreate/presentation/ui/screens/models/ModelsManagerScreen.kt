@@ -55,8 +55,19 @@ fun ModelsManagerScreen(
                     .padding(horizontal = Spacing.lg),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                TabButton("الموجودة", selectedTab == "active") { selectedTab = "active" }
-                TabButton("إضافة نموذج", selectedTab == "add") { selectedTab = "add" }
+                // ✅ تمرير الوزن كـ modifier خارجي
+                TabButton(
+                    text = "الموجودة",
+                    selected = selectedTab == "active",
+                    onClick = { selectedTab = "active" },
+                    modifier = Modifier.weight(1f)
+                )
+                TabButton(
+                    text = "إضافة نموذج",
+                    selected = selectedTab == "add",
+                    onClick = { selectedTab = "add" },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             Spacer(modifier = Modifier.height(Spacing.md))
@@ -106,12 +117,14 @@ fun ModelsManagerScreen(
 }
 
 @Composable
-private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
-    // ✅ استخدام Modifier.weight(1f) بشكل صريح
+private fun TabButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier   // ✅ استقبال modifier من الخارج
+) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .weight(1f)
+        modifier = modifier
             .height(ComponentSize.buttonHeightLg)
             .clip(RoundedCornerShape(Radius.xl))
             .background(
@@ -124,7 +137,12 @@ private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = TextPrimary, fontSize = AppFontSize.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            text = text,
+            color = TextPrimary,
+            fontSize = AppFontSize.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -153,7 +171,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
         ) {
             Text("الفئة:", color = TextPrimary, fontSize = AppFontSize.bodyMedium)
             var expanded by remember { mutableStateOf(false) }
-            // ✅ استخدام Modifier.weight(1f) هنا أيضاً
+            // ✅ هنا وزن الـ Box صحيح لأنه داخل Row
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
