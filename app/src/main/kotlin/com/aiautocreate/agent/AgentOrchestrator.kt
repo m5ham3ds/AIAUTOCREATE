@@ -3,7 +3,6 @@ package com.aiautocreate.agent
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.generateText
 import com.aiautocreate.data.repository.AppSettingsRepository
-import com.aiautocreate.domain.model.AgentInterventionLog
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +16,9 @@ import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// تعريف AgentInterventionLog موجود في نهاية الملف
+// لذلك لا حاجة لاستيراده
 
 @Singleton
 class AgentOrchestrator @Inject constructor(
