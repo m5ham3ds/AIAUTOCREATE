@@ -36,7 +36,6 @@ class PexelsAssetProvider @Inject constructor(
                     Asset(
                         id = "pexels_${video.id}",
                         name = video.user?.name ?: "فيديو من Pexels",
-                        type = "video",
                         fileUrl = videoFile?.link,
                         command = null,
                         localPath = null
@@ -60,7 +59,6 @@ class PexelsAssetProvider @Inject constructor(
                     Asset(
                         id = "pexels_${photo.id}",
                         name = photo.photographer ?: "صورة من Pexels",
-                        type = "image",
                         fileUrl = photo.src?.large,
                         command = null,
                         localPath = null
