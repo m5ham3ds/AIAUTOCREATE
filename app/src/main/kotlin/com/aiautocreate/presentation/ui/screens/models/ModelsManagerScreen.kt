@@ -55,7 +55,6 @@ fun ModelsManagerScreen(
                     .padding(horizontal = Spacing.lg),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                // ✅ تمرير الوزن كـ modifier خارجي
                 TabButton(
                     text = "الموجودة",
                     selected = selectedTab == "active",
@@ -121,7 +120,7 @@ private fun TabButton(
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier   // ✅ استقبال modifier من الخارج
+    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
@@ -149,6 +148,7 @@ private fun TabButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsManagerState) {
+	
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -526,8 +526,12 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
+// ✅ بطاقة النموذج المعدلة
 @Composable
 private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewModel) {
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -593,16 +597,17 @@ private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewMod
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
+                // ✅ زر "الإعدادات" بدلاً من "تغيير الحالة"
                 Button(
-                    onClick = { viewModel.toggleModel(model.id, !model.isEnabled) },
+                    onClick = { showSettingsDialog = true },
                     modifier = Modifier.weight(1f).height(ComponentSize.buttonHeightLg),
                     shape = RoundedCornerShape(Radius.lg),
                     colors = ButtonDefaults.buttonColors(containerColor = CardSecondary)
                 ) {
-                    Text("تغيير الحالة", color = TextPrimary, fontSize = AppFontSize.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("الإعدادات", color = TextPrimary, fontSize = AppFontSize.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 Button(
-                    onClick = { viewModel.deleteModel(model) },
+                    onClick = { showDeleteDialog = true },
                     modifier = Modifier.weight(1f).height(ComponentSize.buttonHeightLg),
                     shape = RoundedCornerShape(Radius.lg),
                     colors = ButtonDefaults.buttonColors(containerColor = ButtonPrimaryStart)
@@ -611,5 +616,109 @@ private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewMod
                 }
             }
         }
+    }
+
+    // ✅ حوار إعدادات النموذج (قابل للتعديل)
+    if (showSettingsDialog) {
+        var editedName by remember { mutableStateOf(model.modelName) }
+        var editedCategory by remember { mutableStateOf(model.category) }
+        var editedEnabled by remember { mutableStateOf(model.isEnabled) }
+        var editedSettingsUrl by remember { mutableStateOf(model.settingsUrl) }
+        var editedReadmeUrl by remember { mutableStateOf(model.readmeUrl) }
+
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("تعديل النموذج") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editedName,
+                        onValueChange = { editedName = it },
+                        label = { Text("اسم النموذج") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    OutlinedTextField(
+                        value = editedCategory,
+                        onValueChange = { editedCategory = it },
+                        label = { Text("الفئة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    OutlinedTextField(
+                        value = editedSettingsUrl,
+                        onValueChange = { editedSettingsUrl = it },
+                        label = { Text("رابط الإعدادات (اختياري)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    OutlinedTextField(
+                        value = editedReadmeUrl,
+                        onValueChange = { editedReadmeUrl = it },
+                        label = { Text("رابط README") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = editedEnabled,
+                            onCheckedChange = { editedEnabled = it }
+                        )
+                        Text("النموذج مفعل", color = TextPrimary)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updatedModel = model.copy(
+                            modelName = editedName,
+                            category = editedCategory,
+                            isEnabled = editedEnabled,
+                            settingsUrl = editedSettingsUrl,
+                            readmeUrl = editedReadmeUrl
+                        )
+                        viewModel.updateModel(updatedModel)
+                        showSettingsDialog = false
+                    }
+                ) {
+                    Text("حفظ")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingsDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+
+    // ✅ حوار تأكيد الحذف
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("تأكيد الحذف") },
+            text = { Text("هل أنت متأكد من حذف النموذج \"${model.modelName}\"؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteModel(model)
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                ) {
+                    Text("نعم، احذف")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("لا")
+                }
+            }
+        )
     }
 }
