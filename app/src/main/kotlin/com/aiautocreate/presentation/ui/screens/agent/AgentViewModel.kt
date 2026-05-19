@@ -2,6 +2,7 @@ package com.aiautocreate.presentation.ui.screens.agent
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aiautocreate.AIAutoCreateApp
 import com.aiautocreate.agent.AgentEvent
 import com.aiautocreate.agent.AgentInterventionLog
 import com.aiautocreate.agent.AgentOrchestrator
@@ -10,6 +11,7 @@ import com.aiautocreate.data.datasource.remote.dto.request.Content
 import com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto
 import com.aiautocreate.data.datasource.remote.dto.request.Part
 import com.aiautocreate.data.repository.AppSettingsRepository
+import com.aiautocreate.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -119,6 +121,17 @@ class AgentViewModel @Inject constructor(
         val text = _state.value.inputText.trim()
         if (text.isEmpty()) return
 
+        // ✅ إضافة فحص الاتصال بالإنترنت
+        if (!NetworkUtils.isOnline(AIAutoCreateApp.instance)) {
+            _state.update {
+                it.copy(
+                    isChatLoading = false,
+                    chatError = "لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة."
+                )
+            }
+            return
+        }
+
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             text = text,
@@ -134,10 +147,23 @@ class AgentViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                // ✅ التأكد من وجود مفتاح Gemini API
+                val apiKey = settingsRepo.getStringOnce("gemini_key")
+                if (apiKey.isBlank()) {
+                    _state.update {
+                        it.copy(
+                            isChatLoading = false,
+                            chatError = "مفتاح Gemini API غير موجود. يرجى إدخاله في إعدادات النماذج."
+                        )
+                    }
+                    return@launch
+                }
+
                 val request = GeminiRequestDto(
                     contents = listOf(Content(parts = listOf(Part(text = text))))
                 )
-                val response = geminiApi.generateContentWithKey(request)
+                // استخدام generateContent مع تمرير المفتاح صراحة لضمان العمل
+                val response = geminiApi.generateContent(apiKey, request)
                 val replyText = if (response.isSuccessful) {
                     response.body()?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                         ?: "عذراً، لم أستطع فهم الرد."
