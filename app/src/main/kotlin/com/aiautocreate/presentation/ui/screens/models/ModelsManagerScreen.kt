@@ -109,6 +109,7 @@ fun ModelsManagerScreen(
 private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
+            .fillMaxWidth()
             .weight(1f)
             .height(ComponentSize.buttonHeightLg)
             .clip(RoundedCornerShape(Radius.xl))
@@ -134,7 +135,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg)
     ) {
-        // ======================== بحث حسب الفئة ========================
         Text(
             text = "البحث حسب الفئة",
             color = TextSecondary,
@@ -154,11 +154,13 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             var expanded by remember { mutableStateOf(false) }
             Box(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(Radius.lg))
                     .background(CardInputDark)
                     .clickable { expanded = true }
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = when (state.selectedCategoryForSearch) {
@@ -177,29 +179,29 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     fontSize = AppFontSize.titleMedium,
                     textAlign = TextAlign.End
                 )
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    listOf(
-                        "text-to-image" to "توليد الصور",
-                        "image-to-image" to "تعديل الصور",
-                        "text-to-video" to "توليد الفيديو",
-                        "image-to-video" to "صورة إلى فيديو",
-                        "text-to-speech" to "نص إلى صوت",
-                        "audio-to-audio" to "معالجة الصوت",
-                        "automatic-speech-recognition" to "نسخ الصوت",
-                        "text-generation" to "توليد النص",
-                        "text2text-generation" to "معالجة النص"
-                    ).forEach { (tag, label) ->
-                        DropdownMenuItem(
-                            text = { Text(label) },
-                            onClick = {
-                                viewModel.setSelectedCategory(tag)
-                                expanded = false
-                            }
-                        )
-                    }
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                listOf(
+                    "text-to-image" to "توليد الصور",
+                    "image-to-image" to "تعديل الصور",
+                    "text-to-video" to "توليد الفيديو",
+                    "image-to-video" to "صورة إلى فيديو",
+                    "text-to-speech" to "نص إلى صوت",
+                    "audio-to-audio" to "معالجة الصوت",
+                    "automatic-speech-recognition" to "نسخ الصوت",
+                    "text-generation" to "توليد النص",
+                    "text2text-generation" to "معالجة النص"
+                ).forEach { (tag, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            viewModel.setSelectedCategory(tag)
+                            expanded = false
+                        }
+                    )
                 }
             }
         }
@@ -219,7 +221,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
         }
         Spacer(modifier = Modifier.height(Spacing.md))
 
-        // عرض نتائج البحث حسب الفئة
         if (state.categorySearchResults.isNotEmpty()) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardDark),
@@ -259,7 +260,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             Spacer(modifier = Modifier.height(Spacing.md))
         }
 
-        // ======================== بحث بالمعرف ========================
         Text(
             text = "أو ابحث بمعرف النموذج",
             color = TextSecondary,
@@ -299,7 +299,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
         }
         Spacer(modifier = Modifier.height(Spacing.md))
 
-        // عرض خطأ البحث
         if (state.searchError != null) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardDark),
@@ -315,7 +314,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             Spacer(modifier = Modifier.height(Spacing.md))
         }
 
-        // عرض نتيجة البحث بالمعرف (إن وجدت)
         if (state.searchedModel != null && state.editableModel != null) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardSecondary),
@@ -325,7 +323,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     Text("نتيجة البحث:", color = PrimaryLight, fontSize = AppFontSize.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // اسم النموذج (قابل للتعديل)
                     OutlinedTextField(
                         value = state.editableModel.customName,
                         onValueChange = { viewModel.updateEditableModel(it, state.editableModel.customDescription) },
@@ -340,7 +337,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // الوصف (قابل للتعديل)
                     OutlinedTextField(
                         value = state.editableModel.customDescription,
                         onValueChange = { viewModel.updateEditableModel(state.editableModel.customName, it) },
@@ -355,7 +351,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // الفئة (قائمة منسدلة)
                     Text("الفئة", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(modifier = Modifier.height(Spacing.xs))
                     var categoryExpanded by remember { mutableStateOf(false) }
@@ -420,7 +415,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     }
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // رابط الإعدادات (اختياري)
                     OutlinedTextField(
                         value = state.editableModel.settingsUrl,
                         onValueChange = { viewModel.updateEditableSettingsUrl(it) },
@@ -436,7 +430,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // رابط README (مقترح تلقائياً)
                     OutlinedTextField(
                         value = state.editableModel.readmeUrl,
                         onValueChange = { viewModel.updateEditableReadmeUrl(it) },
@@ -452,7 +445,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // الأنماط المدعومة (مدخلة كنص CSV)
                     OutlinedTextField(
                         value = state.editableModel.supportedStyles,
                         onValueChange = { viewModel.updateEditableSupportedStyles(it) },
@@ -468,7 +460,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // دعم استنساخ الصوت
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = state.editableModel.supportsVoiceCloning,
@@ -478,7 +469,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     }
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // معلومات إضافية للقراءة فقط
                     Text("المعرف: ${state.searchedModel.id}", color = TextHint, fontSize = AppFontSize.bodySmall)
                     if (!state.searchedModel.pipelineTag.isNullOrEmpty()) {
                         Text("التصنيف: ${state.searchedModel.pipelineTag}", color = TextHint, fontSize = AppFontSize.bodySmall)
