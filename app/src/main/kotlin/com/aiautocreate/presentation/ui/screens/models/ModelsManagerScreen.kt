@@ -107,10 +107,11 @@ fun ModelsManagerScreen(
 
 @Composable
 private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
+    // ✅ استخدام Modifier.weight(1f) بشكل صريح
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f)   // ✅ Modifier.weight يعمل بشكل صحيح داخل Row
+            .weight(1f)
             .height(ComponentSize.buttonHeightLg)
             .clip(RoundedCornerShape(Radius.xl))
             .background(
@@ -152,10 +153,11 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
         ) {
             Text("الفئة:", color = TextPrimary, fontSize = AppFontSize.bodyMedium)
             var expanded by remember { mutableStateOf(false) }
+            // ✅ استخدام Modifier.weight(1f) هنا أيضاً
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)   // ✅ Modifier.weight يعمل الآن
+                    .weight(1f)
                     .clip(RoundedCornerShape(Radius.lg))
                     .background(CardInputDark)
                     .clickable { expanded = true }
