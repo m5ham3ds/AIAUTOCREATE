@@ -25,6 +25,7 @@ import com.aiautocreate.R
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.presentation.common.components.*
 import com.aiautocreate.presentation.ui.theme.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -526,12 +527,12 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
-// ✅ بطاقة النموذج المعدلة (مع تمرير scope لاستدعاء updateModel)
+// ✅ بطاقة النموذج المعدلة (مع تمرير scope)
 @Composable
 private fun ModelManagerCard(
     model: ModelConfig,
     viewModel: ModelsManagerViewModel,
-    scope: androidx.compose.runtime.CoroutineScope
+    scope: CoroutineScope
 ) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -621,7 +622,7 @@ private fun ModelManagerCard(
         }
     }
 
-    // ✅ حوار إعدادات النموذج (قابل للتعديل) – مع استدعاء updateModel داخل scope.launch
+    // ✅ حوار إعدادات النموذج
     if (showSettingsDialog) {
         var editedName by remember { mutableStateOf(model.modelName) }
         var editedCategory by remember { mutableStateOf(model.category) }
