@@ -25,6 +25,7 @@ import com.aiautocreate.R
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.presentation.common.components.*
 import com.aiautocreate.presentation.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +36,7 @@ fun ModelsManagerScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf("active") }
+    val scope = rememberCoroutineScope()
 
     Box(
         modifier = modifier
@@ -85,7 +87,7 @@ fun ModelsManagerScreen(
                         }
                     } else {
                         state.models.forEach { model ->
-                            ModelManagerCard(model, viewModel)
+                            ModelManagerCard(model, viewModel, scope)
                             Spacer(modifier = Modifier.height(Spacing.sm))
                         }
                     }
@@ -148,7 +150,6 @@ private fun TabButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsManagerState) {
-	
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -171,7 +172,6 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
         ) {
             Text("الفئة:", color = TextPrimary, fontSize = AppFontSize.bodyMedium)
             var expanded by remember { mutableStateOf(false) }
-            // ✅ هنا وزن الـ Box صحيح لأنه داخل Row
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -526,9 +526,13 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
-// ✅ بطاقة النموذج المعدلة
+// ✅ بطاقة النموذج المعدلة (مع تمرير scope لاستدعاء updateModel)
 @Composable
-private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewModel) {
+private fun ModelManagerCard(
+    model: ModelConfig,
+    viewModel: ModelsManagerViewModel,
+    scope: androidx.compose.runtime.CoroutineScope
+) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -597,7 +601,6 @@ private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewMod
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                // ✅ زر "الإعدادات" بدلاً من "تغيير الحالة"
                 Button(
                     onClick = { showSettingsDialog = true },
                     modifier = Modifier.weight(1f).height(ComponentSize.buttonHeightLg),
@@ -618,7 +621,7 @@ private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewMod
         }
     }
 
-    // ✅ حوار إعدادات النموذج (قابل للتعديل)
+    // ✅ حوار إعدادات النموذج (قابل للتعديل) – مع استدعاء updateModel داخل scope.launch
     if (showSettingsDialog) {
         var editedName by remember { mutableStateOf(model.modelName) }
         var editedCategory by remember { mutableStateOf(model.category) }
@@ -682,7 +685,9 @@ private fun ModelManagerCard(model: ModelConfig, viewModel: ModelsManagerViewMod
                             settingsUrl = editedSettingsUrl,
                             readmeUrl = editedReadmeUrl
                         )
-                        viewModel.updateModel(updatedModel)
+                        scope.launch {
+                            viewModel.updateModel(updatedModel)
+                        }
                         showSettingsDialog = false
                     }
                 ) {
