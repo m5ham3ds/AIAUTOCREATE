@@ -112,7 +112,7 @@ private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .weight(1f)
             .height(ComponentSize.buttonHeightLg)
-            .clip(RoundedCornerShape(Radius.xl))
+            .clip(RoundedCornerShape(Radius.xl)
             .background(
                 if (selected) Brush.horizontalGradient(colors = listOf(Primary, PrimaryLight))
                 else Brush.horizontalGradient(colors = listOf(BackgroundMain, BackgroundMain))
