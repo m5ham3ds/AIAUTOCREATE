@@ -159,6 +159,17 @@ class HomeViewModel @Inject constructor(
         }
         if (s.isProcessing) return
 
+        // ✅ إضافة فحص الاتصال بالإنترنت
+        if (!NetworkUtils.isOnline(AIAutoCreateApp.instance)) {
+            _state.update {
+                it.copy(
+                    errorMessage = "لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.",
+                    isProcessing = false
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             _state.update {
                 it.copy(
@@ -174,12 +185,10 @@ class HomeViewModel @Inject constructor(
             try {
                 val profile = getMontageProfile(s.selectedMontageStyle)
 
-                // النماذج الأساسية
                 val sdModel = settingsRepo.getSelectedModelForCategory("image")
                 val img2VidModel = settingsRepo.getSelectedModelForCategory("video")
                 val ttsModel = settingsRepo.getSelectedModelForCategory("tts")
 
-                // ✅ النماذج المتخصصة للمهام المختلفة
                 val masterModelId = settingsRepo.getSelectedModelForCategory("master")
                 val audioFxModelId = settingsRepo.getSelectedModelForCategory("audio_fx")
                 val visualFxModelId = settingsRepo.getSelectedModelForCategory("visual_fx")
@@ -203,7 +212,7 @@ class HomeViewModel @Inject constructor(
                     sdModel = sdModel,
                     img2VidModel = img2VidModel,
                     ttsModel = ttsModel,
-                    selectedFps = profile.fps,   // ✅ تمرير FPS إلى PipelineConfig (يجب إضافته في PipelineConfig)
+                    selectedFps = profile.fps,
                     masterModelId = masterModelId,
                     audioFxModelId = audioFxModelId,
                     visualFxModelId = visualFxModelId,
@@ -237,6 +246,7 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+            
 
     fun clearError() {
         _state.update { it.copy(errorMessage = null) }
