@@ -33,7 +33,6 @@ fun ModelsManagerScreen(
     modifier: Modifier = Modifier,
     viewModel: ModelsManagerViewModel = hiltViewModel()
 ) {
-
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf("active") }
 
@@ -112,7 +111,7 @@ private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .weight(1f)
             .height(ComponentSize.buttonHeightLg)
-            .clip(RoundedCornerShape(Radius.xl)
+            .clip(RoundedCornerShape(Radius.xl))
             .background(
                 if (selected) Brush.horizontalGradient(colors = listOf(Primary, PrimaryLight))
                 else Brush.horizontalGradient(colors = listOf(BackgroundMain, BackgroundMain))
@@ -127,6 +126,7 @@ private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsManagerState) {
     Column(
@@ -134,7 +134,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg)
     ) {
-        // ======================== بحث حسب الفئة (جديد) ========================
+        // ======================== بحث حسب الفئة ========================
         Text(
             text = "البحث حسب الفئة",
             color = TextSecondary,
@@ -259,7 +259,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             Spacer(modifier = Modifier.height(Spacing.md))
         }
 
-        // ======================== بحث بالمعرف (الموجود سابقاً) ========================
+        // ======================== بحث بالمعرف ========================
         Text(
             text = "أو ابحث بمعرف النموذج",
             color = TextSecondary,
@@ -359,7 +359,10 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     Text("الفئة", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(modifier = Modifier.height(Spacing.xs))
                     var categoryExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = categoryExpanded, onExpandedChange = { categoryExpanded = it }) {
+                    ExposedDropdownMenuBox(
+                        expanded = categoryExpanded,
+                        onExpandedChange = { categoryExpanded = it }
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -390,7 +393,10 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                                 textAlign = TextAlign.End
                             )
                         }
-                        ExposedDropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
+                        ExposedDropdownMenu(
+                            expanded = categoryExpanded,
+                            onDismissRequest = { categoryExpanded = false }
+                        ) {
                             listOf(
                                 "image" to "توليد الصور",
                                 "video" to "تحويل الصورة إلى فيديو",
@@ -462,7 +468,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    // دعم استنساخ الصوت (لنماذج TTS فقط، ولكن نعرضها للجميع)
+                    // دعم استنساخ الصوت
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = state.editableModel.supportsVoiceCloning,
