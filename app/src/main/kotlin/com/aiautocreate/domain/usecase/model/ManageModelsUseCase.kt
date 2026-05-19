@@ -23,6 +23,11 @@ class ManageModelsUseCase @Inject constructor(
         return modelsRepository.insertModelConfig(model)
     }
 
+    // ✅ الدالة الجديدة: تحديث نموذج موجود
+    suspend fun updateModel(model: ModelConfig) {
+        modelsRepository.updateModelConfig(model)
+    }
+
     suspend fun removeModel(model: ModelConfig) {
         modelsRepository.deleteModelConfig(model)
     }
