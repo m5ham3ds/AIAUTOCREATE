@@ -18,8 +18,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiautocreate.R
@@ -65,25 +63,36 @@ fun ModelsSettingsScreen(
                 Spacer(modifier = Modifier.height(Spacing.md))
             }
 
-            AppButton(
-                text = "تحديث القوائم ↻",
+            // ✅ إعادة ترتيب الأزرار بشكل آمن
+            Button(
                 onClick = { viewModel.refreshModelsInBackground() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
-            )
+                    .height(ComponentSize.buttonHeightLg),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                shape = RoundedCornerShape(Radius.xxl)
+            ) {
+                Text("تحديث القوائم ↻", color = TextPrimary, fontSize = AppFontSize.titleMedium, fontWeight = FontWeight.Bold)
+            }
             Spacer(modifier = Modifier.height(Spacing.sm))
 
-            AppButton(
-                text = "حفظ التعديلات 💾",
+            Button(
                 onClick = { viewModel.saveSettings() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
-            )
+                    .height(ComponentSize.buttonHeightLg),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryLight),
+                shape = RoundedCornerShape(Radius.xxl)
+            ) {
+                Text("حفظ التعديلات 💾", color = TextPrimary, fontSize = AppFontSize.titleMedium, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
+
+// باقي الدوال (ApiKeysSection, DynamicModelSelectionSection, VoiceCloneSection) كما هي – لم تتغير
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
