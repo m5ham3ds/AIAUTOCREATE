@@ -35,7 +35,6 @@ class FreesoundAssetProvider @Inject constructor(
                     Asset(
                         id = "freesound_${sound.id}",
                         name = sound.name,
-                        type = "sfx",
                         fileUrl = sound.previews?.previewHqMp3,
                         command = null,
                         localPath = null
