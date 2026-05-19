@@ -83,6 +83,3 @@ class ExecuteAgentTaskUseCase @Inject constructor(
         }
     }
 }
-
-// أضف هذه الدالة المساعدة في AgentOrchestrator (سيتم إضافتها لاحقاً)
-suspend fun AgentOrchestrator.getCurrentMaxDepth(): Int = maxInterventionDepth
