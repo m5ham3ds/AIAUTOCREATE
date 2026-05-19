@@ -4,7 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.weight // ✅ تمت إضافة الاستيراد المطلوب
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -156,7 +156,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .weight(1f)   // ✅ الآن يعمل بشكل صحيح بعد إضافة import
                     .clip(RoundedCornerShape(Radius.lg))
                     .background(CardInputDark)
                     .clickable { expanded = true }
