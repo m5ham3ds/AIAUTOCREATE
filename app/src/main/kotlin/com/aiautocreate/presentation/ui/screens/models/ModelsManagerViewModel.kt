@@ -57,6 +57,14 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
+    // ✅ دالة جديدة لتحديث النموذج (مستخدمة في حوار الإعدادات)
+    fun updateModel(model: ModelConfig) {
+        viewModelScope.launch {
+            manageModelsUseCase.updateModel(model)
+            loadModels() // إعادة تحميل القائمة بعد التحديث
+        }
+    }
+
     // ==================== دوال إضافة النموذج ====================
 
     fun showAddDialog() {
@@ -216,7 +224,7 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    // ==================== دوال البحث حسب الفئة (جديدة) ====================
+    // ==================== دوال البحث حسب الفئة ====================
 
     fun setSelectedCategory(category: String) {
         _state.update { it.copy(selectedCategoryForSearch = category) }
