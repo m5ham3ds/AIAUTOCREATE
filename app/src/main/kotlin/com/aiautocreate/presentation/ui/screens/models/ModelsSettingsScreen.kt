@@ -65,7 +65,6 @@ fun ModelsSettingsScreen(
                 Spacer(modifier = Modifier.height(Spacing.md))
             }
 
-            // ✅ استخدام Button مباشرة بدلاً من AppButton
             Button(
                 onClick = { viewModel.refreshModelsInBackground() },
                 modifier = Modifier
@@ -315,6 +314,7 @@ private fun DynamicModelSelectionSection(state: ModelsSettingsState, viewModel: 
                         expanded = dropdownExpanded,
                         onDismissRequest = { dropdownExpanded = false }
                     ) {
+                        // ✅ إضافة onClick فارغ للعنصر "لا شيء" لتجنب خطأ "No value passed for parameter 'onClick'"
                         DropdownMenuItem(
                             text = { Text("لا شيء", color = TextHint) },
                             onClick = {
@@ -332,9 +332,11 @@ private fun DynamicModelSelectionSection(state: ModelsSettingsState, viewModel: 
                             )
                         }
                         if (availableModels.isEmpty()) {
+                            // ✅ العنصر المعطل يجب أن يحتوي أيضاً على onClick فارغ (أو null) لكن Material3 يتطلب onClick غير nullable
                             DropdownMenuItem(
                                 text = { Text("لا توجد نماذج متاحة", color = TextHint) },
-                                enabled = false
+                                enabled = false,
+                                onClick = {} // ✅ إضافة onClick فارغ لتجنب الخطأ
                             )
                         }
                     }
