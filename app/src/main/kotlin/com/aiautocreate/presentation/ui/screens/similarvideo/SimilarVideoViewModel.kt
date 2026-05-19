@@ -67,7 +67,6 @@ class SimilarVideoViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, progress = 0f, progressText = "0%", errorMessage = null, successMessage = null, logs = emptyList()) }
 
             try {
-                // مرحلة 1: تحليل الفيديو باستخدام VideoAnalyzerAgent
                 _state.update { it.copy(progress = 0.1f, progressText = "10%", logs = it.logs + "جاري تحليل الفيديو...") }
                 val analysisPrompt = "حلل هذا الفيديو واستخرج نمطه البصري وأسلوب التصوير والمشاهد الرئيسية."
                 val result = videoAnalyzer.execute(analysisPrompt)
@@ -78,18 +77,15 @@ class SimilarVideoViewModel @Inject constructor(
                 val description = result.data?.toString() ?: "تم استخراج النمط البصري بنجاح."
                 _state.update { it.copy(progress = 0.5f, progressText = "50%", extractedDescription = description, logs = it.logs + "تم تحليل الفيديو واستخراج النمط البصري.") }
 
-                // مرحلة 2: إنشاء سيناريو جديد
                 _state.update { it.copy(progress = 0.7f, progressText = "70%", logs = it.logs + "جاري إنشاء سيناريو جديد...") }
                 val script = "سيناريو جديد مستوحى من: $description"
                 _state.update { it.copy(progress = 0.8f, progressText = "80%", generatedScript = script, logs = it.logs + "تم إنشاء السيناريو الجديد.") }
 
-                // مرحلة 3: إنشاء فيديو مشابه باستخدام FFmpeg
                 _state.update { it.copy(progress = 0.9f, progressText = "90%", logs = it.logs + "جاري تجميع الفيديو...") }
                 val outputDir = File("/storage/emulated/0/AIAutoCreate/VIDEOS")
                 if (!outputDir.exists()) outputDir.mkdirs()
                 val outputPath = File(outputDir, "similar_${System.currentTimeMillis()}.mp4").absolutePath
 
-                // استخدام FFmpeg لإنشاء فيديو توضيحي (يمكن استبداله لاحقًا بـ VideoCreationWorker)
                 val cmd = "-f lavfi -i color=c=black:s=1280x720:d=5 -vf drawtext=text='Similar Video':fontcolor=white:fontsize=24:x=(w-text_w)/2:y=(h-text_h)/2 $outputPath"
                 FFmpegRunner.execute(cmd)
 
