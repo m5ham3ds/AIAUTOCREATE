@@ -35,7 +35,6 @@ class LotsOfSoundsAssetProvider @Inject constructor(
                     Asset(
                         id = "los_${sound.id}",
                         name = sound.title,
-                        type = "music",
                         fileUrl = sound.previewUrl,
                         command = null,
                         localPath = null
@@ -59,7 +58,6 @@ class LotsOfSoundsAssetProvider @Inject constructor(
                     Asset(
                         id = "los_${sound.id}",
                         name = sound.title,
-                        type = "sfx",
                         fileUrl = sound.previewUrl,
                         command = null,
                         localPath = null
