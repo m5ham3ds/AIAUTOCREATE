@@ -65,7 +65,7 @@ fun ModelsSettingsScreen(
                 Spacer(modifier = Modifier.height(Spacing.md))
             }
 
-            // ✅ إعادة ترتيب الأزرار بشكل آمن
+            // ✅ استخدام Button مباشرة بدلاً من AppButton
             Button(
                 onClick = { viewModel.refreshModelsInBackground() },
                 modifier = Modifier
@@ -93,8 +93,6 @@ fun ModelsSettingsScreen(
         }
     }
 }
-
-// باقي الدوال (ApiKeysSection, DynamicModelSelectionSection, VoiceCloneSection) كما هي – لم تتغير
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
