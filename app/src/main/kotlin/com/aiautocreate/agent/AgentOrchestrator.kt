@@ -1,11 +1,11 @@
 package com.aiautocreate.agent
 
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
+import com.aiautocreate.data.datasource.remote.api.generateText
 import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.model.AgentInterventionLog
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
-import com.aiautocreate.domain.pipeline.Asset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -164,7 +164,6 @@ data class AgentInterventionLog(
     val depth: Int
 )
 
-// تم نقل تعريف Asset إلى هنا لتجنب الاعتماد على PipelineOrchestrator
 data class Asset(
     val id: String,
     val name: String,
