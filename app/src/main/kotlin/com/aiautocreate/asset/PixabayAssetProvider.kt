@@ -36,7 +36,6 @@ class PixabayAssetProvider @Inject constructor(
                     Asset(
                         id = "pixabay_video_${video.id}",
                         name = video.tags?.take(50) ?: "فيديو من Pixabay",
-                        type = "video",
                         fileUrl = videoUrl,
                         command = null,
                         localPath = null
@@ -60,7 +59,6 @@ class PixabayAssetProvider @Inject constructor(
                     Asset(
                         id = "pixabay_image_${image.id}",
                         name = image.tags?.take(50) ?: "صورة من Pixabay",
-                        type = "image",
                         fileUrl = image.largeImageURL,
                         command = null,
                         localPath = null
