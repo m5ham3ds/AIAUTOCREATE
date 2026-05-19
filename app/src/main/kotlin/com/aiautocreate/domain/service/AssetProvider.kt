@@ -1,6 +1,6 @@
 package com.aiautocreate.domain.service
 
-import com.aiautocreate.domain.pipeline.Asset
+import com.aiautocreate.agent.Asset
 
 interface AssetProvider {
 
