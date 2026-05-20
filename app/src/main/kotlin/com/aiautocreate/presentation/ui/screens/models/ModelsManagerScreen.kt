@@ -27,6 +27,23 @@ import com.aiautocreate.presentation.ui.theme.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+// ==================== قائمة الفئات الموحدة (مع جعل "نصوص" في المقدمة) ====================
+private val categoriesList = listOf(
+    "text" to "نصوص",
+    "image" to "توليد الصور",
+    "video" to "تحويل الصورة إلى فيديو",
+    "tts" to "تحويل النص إلى صوت",
+    "analysis" to "تحليل ومعالجة",
+    "reviewer" to "مراجعة وتصحيح",
+    "orchestrator" to "تنسيق عام",
+    "music" to "توليد موسيقى",
+    "transition" to "انتقالات",
+    "subtitle" to "ترجمة",
+    "ffmpeg" to "أوامر FFmpeg"
+)
+
+private val categoriesMap = categoriesList.toMap()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelsManagerScreen(
@@ -98,7 +115,6 @@ fun ModelsManagerScreen(
             }
         }
 
-        // ✅ زر الإضافة ينتقل إلى تبويب الإضافة بدلاً من حوار
         FloatingActionButton(
             onClick = { selectedTab = "add" },
             modifier = Modifier
@@ -391,39 +407,19 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                when (state.editableModel.category) {
-                                    "image" -> "توليد الصور"
-                                    "video" -> "تحويل الصورة إلى فيديو"
-                                    "tts" -> "تحويل النص إلى صوت"
-                                    "analysis" -> "تحليل ومعالجة"
-                                    "reviewer" -> "مراجعة وتصحيح"
-                                    "orchestrator" -> "تنسيق عام"
-                                    "music" -> "توليد موسيقى"
-                                    "transition" -> "انتقالات"
-                                    "subtitle" -> "ترجمة"
-                                    else -> "تحليل ومعالجة"
-                                },
+                                text = categoriesMap[state.editableModel.category] ?: "اختر الفئة",
                                 color = TextPrimary,
                                 fontSize = AppFontSize.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.End
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                         ExposedDropdownMenu(
                             expanded = categoryExpanded,
                             onDismissRequest = { categoryExpanded = false }
                         ) {
-                            listOf(
-                                "image" to "توليد الصور",
-                                "video" to "تحويل الصورة إلى فيديو",
-                                "tts" to "تحويل النص إلى صوت",
-                                "analysis" to "تحليل ومعالجة",
-                                "reviewer" to "مراجعة وتصحيح",
-                                "orchestrator" to "تنسيق عام",
-                                "music" to "توليد موسيقى",
-                                "transition" to "انتقالات",
-                                "subtitle" to "ترجمة"
-                            ).forEach { (value, label) ->
+                            categoriesList.forEach { (value, label) ->
                                 DropdownMenuItem(
                                     text = { Text(label) },
                                     onClick = {
@@ -527,7 +523,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
-// ✅ بطاقة النموذج المحسّنة مع حوار احترافي
+// ✅ بطاقة النموذج المحسّنة مع حوار احترافي (باستخدام القائمة الموحدة)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelManagerCard(
@@ -537,18 +533,6 @@ private fun ModelManagerCard(
 ) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-
-    val categories = listOf(
-        "image" to "توليد الصور",
-        "video" to "تحويل الصورة إلى فيديو",
-        "tts" to "تحويل النص إلى صوت",
-        "analysis" to "تحليل ومعالجة",
-        "reviewer" to "مراجعة وتصحيح",
-        "orchestrator" to "تنسيق عام",
-        "music" to "توليد موسيقى",
-        "transition" to "انتقالات",
-        "subtitle" to "ترجمة"
-    )
 
     Box(
         modifier = Modifier
@@ -582,7 +566,7 @@ private fun ModelManagerCard(
                         Text(model.description.take(80), color = TextBody, fontSize = AppFontSize.bodySmall)
                     }
                     if (model.category.isNotEmpty()) {
-                        Text("الفئة: ${categories.find { it.first == model.category }?.second ?: model.category}", color = TextHint, fontSize = AppFontSize.caption)
+                        Text("الفئة: ${categoriesMap[model.category] ?: model.category}", color = TextHint, fontSize = AppFontSize.caption)
                     }
                 }
                 Row(
@@ -641,6 +625,7 @@ private fun ModelManagerCard(
         var editedEnabled by remember { mutableStateOf(model.isEnabled) }
         var editedModelUrl by remember { mutableStateOf(model.settingsUrl) }
         var editedReadmeUrl by remember { mutableStateOf(model.readmeUrl) }
+        var editedSupportsVoiceCloning by remember { mutableStateOf(model.supportsVoiceCloning) }
         var categoryExpanded by remember { mutableStateOf(false) }
 
         AlertDialog(
@@ -693,7 +678,7 @@ private fun ModelManagerCard(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = categories.find { it.first == editedCategory }?.second ?: "اختر الفئة",
+                                text = categoriesMap[editedCategory] ?: "اختر الفئة",
                                 color = TextPrimary,
                                 fontSize = AppFontSize.titleMedium,
                                 fontWeight = FontWeight.Bold,
@@ -705,7 +690,7 @@ private fun ModelManagerCard(
                             expanded = categoryExpanded,
                             onDismissRequest = { categoryExpanded = false }
                         ) {
-                            categories.forEach { (value, label) ->
+                            categoriesList.forEach { (value, label) ->
                                 DropdownMenuItem(
                                     text = { Text(label) },
                                     onClick = {
@@ -765,6 +750,15 @@ private fun ModelManagerCard(
                             cursorColor = PrimaryLight
                         )
                     )
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = editedSupportsVoiceCloning,
+                            onCheckedChange = { editedSupportsVoiceCloning = it }
+                        )
+                        Text("يدعم استنساخ الصوت", color = TextPrimary, fontSize = AppFontSize.bodyMedium)
+                    }
                 }
             },
             confirmButton = {
@@ -775,7 +769,8 @@ private fun ModelManagerCard(
                             category = editedCategory,
                             isEnabled = editedEnabled,
                             settingsUrl = editedModelUrl,
-                            readmeUrl = editedReadmeUrl
+                            readmeUrl = editedReadmeUrl,
+                            supportsVoiceCloning = editedSupportsVoiceCloning
                         )
                         scope.launch { viewModel.updateModel(updatedModel) }
                         showSettingsDialog = false
