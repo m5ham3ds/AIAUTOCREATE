@@ -1,12 +1,11 @@
 package com.aiautocreate.presentation.ui.screens.models
 
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aiautocreate.data.datasource.local.datastore.DataStoreManager
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.response.HfModelInfo
 import com.aiautocreate.domain.model.ModelConfig
+import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.domain.usecase.model.CheckApiModelsUseCase
 import com.aiautocreate.domain.usecase.model.ManageModelsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +19,7 @@ class ModelsManagerViewModel @Inject constructor(
     private val manageModelsUseCase: ManageModelsUseCase,
     private val checkApiModelsUseCase: CheckApiModelsUseCase,
     private val huggingFaceApi: HuggingFaceApi,
-    private val dataStoreManager: DataStoreManager
+    private val secureSettingsRepo: ISettingsRepository   // ✅ استخدام الواجهة الموحدة
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -70,8 +69,7 @@ class ModelsManagerViewModel @Inject constructor(
     // ==================== دوال إضافة النموذج ====================
 
     private suspend fun getHuggingFaceToken(): String {
-        val preferences = dataStoreManager.dataStore.data.first()
-        return preferences[stringPreferencesKey("hf_token")] ?: ""
+        return secureSettingsRepo.getHuggingFaceToken() ?: ""
     }
 
     fun onSearchQueryChanged(query: String) {
@@ -127,7 +125,8 @@ class ModelsManagerViewModel @Inject constructor(
             }
         }
     }
-
+    // باقي الدوال (updateEditableModel, addModelFromSearch, searchModelsByCategory) كما هي دون تغيير
+    // ...
     fun updateEditableModel(customName: String, customDescription: String) {
         _state.update { state ->
             val current = state.editableModel ?: return@update state
