@@ -24,31 +24,52 @@ class DefaultModelsInitializer @Inject constructor(
                 return@runBlocking
             }
 
-            // إضافة نموذج Gemini (Google)
+            // إضافة نموذج Gemini (Google) مع أنماط نصية افتراضية
             val geminiModel = ModelConfig(
-                id = 0,
-                modelId = "gemini-2.0-flash",
-                modelName = "Gemini 2.0 Flash",
-                provider = "google",
-                isEnabled = true,
-                description = "نموذج Gemini من Google لتوليد النصوص وتحليلها ومعالجة المهام المتعددة.",
-                pipelineTag = "text-generation",
-                tags = listOf("google", "llm", "chat"),
-                modelUrl = "https://ai.google.dev/gemini-api",
-                category = "analysis",          // مناسب للتحليل والمعالجة
-                settingsUrl = "",
-                readmeUrl = "",
-                supportedStyles = emptyList(),
-                supportsVoiceCloning = false,
-                apiEndpoint = null,
-                parametersJson = null,
-                createdAt = System.currentTimeMillis()
-            )
-            modelsRepository.insertModelConfig(geminiModel)
-
-            // يمكنك إضافة نماذج HuggingFace أساسية هنا إذا أردت
-            // مثلاً نموذج افتراضي للصور، فيديو، إلخ.
-            // لكن الأفضل ترك المستخدم يضيفها بنفسه.
+    id = 0,
+    modelId = "gemini-2.0-flash",
+    modelName = "Gemini 2.0 Flash",
+    provider = "google",
+    isEnabled = true,
+    description = "نموذج Gemini من Google لتوليد النصوص وتحليلها ومعالجة المهام المتعددة.",
+    pipelineTag = "text-generation",
+    tags = listOf("google", "llm", "chat"),
+    modelUrl = "https://ai.google.dev/gemini-api",
+    category = "text",   // ✅ فئة النصوص
+    settingsUrl = "",
+    readmeUrl = "",
+    supportedStyles = listOf(
+        "تحليل النصوص",
+        "تلخيص",
+        "توليد النصوص",
+        "مراجعة",
+        "تصحيح لغوي",
+        "تنسيق عام"
+    ),
+    supportsVoiceCloning = false,
+    apiEndpoint = null,
+    parametersJson = null,
+    createdAt = System.currentTimeMillis()
+)
+            // يمكنك إضافة نماذج HuggingFace أساسية أخرى هنا إذا أردت
+            // (اختياري) نموذج إضافي لتحليل النصوص من HuggingFace
+             val hfAnalysisModel = ModelConfig(
+                 id = 0,
+                 modelId = "google/flan-t5-base",
+                 modelName = "Flan T5 Base",
+                 provider = "huggingface",
+                 isEnabled = true,
+                 description = "نموذج تحليل نصوص متعدد المهام",
+                 pipelineTag = "text2text-generation",
+                 tags = listOf("text-generation", "analysis"),
+                 modelUrl = "https://huggingface.co/google/flan-t5-base",
+                 category = "analysis",
+                 readmeUrl = "https://huggingface.co/google/flan-t5-base/raw/main/README.md",
+                 supportedStyles = listOf("أسئلة وأجوبة", "تلخيص", "ترجمة"),
+                 supportsVoiceCloning = false,
+                 createdAt = System.currentTimeMillis()
+             )
+             modelsRepository.insertModelConfig(hfAnalysisModel)
         }
     }
 }
