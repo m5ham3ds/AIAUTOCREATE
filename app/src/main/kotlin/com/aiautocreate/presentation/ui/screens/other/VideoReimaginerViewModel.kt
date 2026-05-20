@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.repository.AppSettingsRepository
+import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.util.FFmpegRunner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -13,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class VideoReimaginerViewModel @Inject constructor(
-    private val settingsRepo: AppSettingsRepository,
+    private val appSettingsRepo: AppSettingsRepository,
+    private val secureSettingsRepo: ISettingsRepository,   // ✅ للمفاتيح
     private val huggingFaceApi: HuggingFaceApi
 ) : ViewModel() {
 
@@ -26,10 +28,10 @@ class VideoReimaginerViewModel @Inject constructor(
 
     private fun loadDefaults() {
         viewModelScope.launch {
-            val res = settingsRepo.getStringOnce("reimaginer_resolution", "4K")
-            val fps = settingsRepo.getStringOnce("reimaginer_fps", "60fps")
-            val colors = settingsRepo.getStringOnce("reimaginer_colors", "true").toBoolean()
-            val noise = settingsRepo.getStringOnce("reimaginer_noise", "true").toBoolean()
+            val res = appSettingsRepo.getStringOnce("reimaginer_resolution", "4K")
+            val fps = appSettingsRepo.getStringOnce("reimaginer_fps", "60fps")
+            val colors = appSettingsRepo.getStringOnce("reimaginer_colors", "true").toBoolean()
+            val noise = appSettingsRepo.getStringOnce("reimaginer_noise", "true").toBoolean()
             _state.update { it.copy(selectedResolution = res, selectedFps = fps, enhanceColors = colors, reduceNoise = noise) }
         }
     }
@@ -48,24 +50,24 @@ class VideoReimaginerViewModel @Inject constructor(
 
     fun onResolutionSelected(resolution: String) {
         _state.update { it.copy(selectedResolution = resolution) }
-        viewModelScope.launch { settingsRepo.setString("reimaginer_resolution", resolution) }
+        viewModelScope.launch { appSettingsRepo.setString("reimaginer_resolution", resolution) }
     }
 
     fun onFpsSelected(fps: String) {
         _state.update { it.copy(selectedFps = fps) }
-        viewModelScope.launch { settingsRepo.setString("reimaginer_fps", fps) }
+        viewModelScope.launch { appSettingsRepo.setString("reimaginer_fps", fps) }
     }
 
     fun toggleEnhanceColors() {
         val newValue = !_state.value.enhanceColors
         _state.update { it.copy(enhanceColors = newValue) }
-        viewModelScope.launch { settingsRepo.setString("reimaginer_colors", newValue.toString()) }
+        viewModelScope.launch { appSettingsRepo.setString("reimaginer_colors", newValue.toString()) }
     }
 
     fun toggleReduceNoise() {
         val newValue = !_state.value.reduceNoise
         _state.update { it.copy(reduceNoise = newValue) }
-        viewModelScope.launch { settingsRepo.setString("reimaginer_noise", newValue.toString()) }
+        viewModelScope.launch { appSettingsRepo.setString("reimaginer_noise", newValue.toString()) }
     }
 
     fun startEnhancement() {
@@ -79,6 +81,15 @@ class VideoReimaginerViewModel @Inject constructor(
             _state.update { it.copy(isProcessing = true, progress = 0f, progressText = "0%", errorMessage = null, successMessage = null, logs = emptyList()) }
 
             try {
+                // ✅ مثال لاستخدام HuggingFace API مع التوكن لتحسين الفيديو (إن وجد)
+                val token = secureSettingsRepo.getHuggingFaceToken()
+                if (token.isNullOrBlank()) {
+                    _state.update { it.copy(logs = it.logs + "تنبيه: لم يتم إدخال HuggingFace Token، سيتم استخدام FFmpeg فقط.") }
+                } else {
+                    // يمكنك استدعاء API مع التوكن هنا
+                    // val response = huggingFaceApi.someVideoEnhancement(modelId, request, "Bearer $token")
+                }
+
                 // مرحلة 1: تحليل الفيديو
                 _state.update { it.copy(progress = 0.2f, progressText = "20%", logs = it.logs + "جاري تحليل الفيديو...") }
 
