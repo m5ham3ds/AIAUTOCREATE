@@ -29,16 +29,18 @@ class ModelsSettingsViewModel @Inject constructor(
     val state: StateFlow<ModelsSettingsState> = _state.asStateFlow()
 
     private val categories = listOf(
-        "image" to "نموذج توليد الصور",
-        "video" to "نموذج تحويل الصورة إلى فيديو",
-        "tts" to "نموذج تحويل النص إلى صوت",
-        "analysis" to "نموذج التحليل والمعالجة",
-        "reviewer" to "نموذج مراجعة وتصحيح",
-        "orchestrator" to "نموذج التنسيق العام",
-        "music" to "نموذج توليد موسيقى",
-        "transition" to "نموذج الانتقالات",
-        "subtitle" to "نموذج الترجمة"
-    )
+    "text" to "نموذج نصوص",
+    "image" to "نموذج توليد الصور",
+    "video" to "نموذج تحويل الصورة إلى فيديو",
+    "tts" to "نموذج تحويل النص إلى صوت",
+    "analysis" to "نموذج التحليل والمعالجة",
+    "reviewer" to "نموذج مراجعة وتصحيح",
+    "orchestrator" to "نموذج التنسيق العام",
+    "music" to "نموذج توليد موسيقى",
+    "transition" to "نموذج الانتقالات",
+    "subtitle" to "نموذج الترجمة",
+    "ffmpeg" to "نموذج أوامر FFmpeg"
+)
 
     init {
         loadSettings()
