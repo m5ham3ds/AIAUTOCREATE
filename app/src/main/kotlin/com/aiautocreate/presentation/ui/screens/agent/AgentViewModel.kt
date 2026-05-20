@@ -11,6 +11,7 @@ import com.aiautocreate.data.datasource.remote.dto.request.Content
 import com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto
 import com.aiautocreate.data.datasource.remote.dto.request.Part
 import com.aiautocreate.data.repository.AppSettingsRepository
+import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -20,7 +21,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val settingsRepo: AppSettingsRepository,
+    private val appSettingsRepo: AppSettingsRepository,           // للإعدادات العامة
+    private val secureSettingsRepo: ISettingsRepository,          // ✅ للمفاتيح الآمنة
     private val geminiApi: GeminiApi,
     private val agentOrchestrator: AgentOrchestrator
 ) : ViewModel() {
@@ -90,11 +92,11 @@ class AgentViewModel @Inject constructor(
     private fun loadPermissions() {
         viewModelScope.launch {
             val perms = AgentPermissions(
-                autoFixErrors = settingsRepo.getStringOnce("agent_auto_fix", "false").toBoolean(),
-                autoRetry = settingsRepo.getStringOnce("agent_auto_retry", "false").toBoolean(),
-                optimizeResources = settingsRepo.getStringOnce("agent_optimize", "false").toBoolean(),
-                accessProjects = settingsRepo.getStringOnce("agent_access", "false").toBoolean(),
-                maxInterventionDepth = settingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
+                autoFixErrors = appSettingsRepo.getStringOnce("agent_auto_fix", "false").toBoolean(),
+                autoRetry = appSettingsRepo.getStringOnce("agent_auto_retry", "false").toBoolean(),
+                optimizeResources = appSettingsRepo.getStringOnce("agent_optimize", "false").toBoolean(),
+                accessProjects = appSettingsRepo.getStringOnce("agent_access", "false").toBoolean(),
+                maxInterventionDepth = appSettingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
             )
             _state.update { it.copy(permissions = perms, isLoading = false) }
         }
@@ -121,7 +123,6 @@ class AgentViewModel @Inject constructor(
         val text = _state.value.inputText.trim()
         if (text.isEmpty()) return
 
-        // ✅ إضافة فحص الاتصال بالإنترنت
         if (!NetworkUtils.isOnline(AIAutoCreateApp.instance)) {
             _state.update {
                 it.copy(
@@ -147,9 +148,9 @@ class AgentViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // ✅ التأكد من وجود مفتاح Gemini API
-                val apiKey = settingsRepo.getStringOnce("gemini_key")
-                if (apiKey.isBlank()) {
+                // ✅ استخدام ISettingsRepository للحصول على مفتاح Gemini
+                val apiKey = secureSettingsRepo.getGeminiKey()
+                if (apiKey.isNullOrBlank()) {
                     _state.update {
                         it.copy(
                             isChatLoading = false,
@@ -162,7 +163,6 @@ class AgentViewModel @Inject constructor(
                 val request = GeminiRequestDto(
                     contents = listOf(Content(parts = listOf(Part(text = text))))
                 )
-                // استخدام generateContent مع تمرير المفتاح صراحة لضمان العمل
                 val response = geminiApi.generateContent(apiKey, request)
                 val replyText = if (response.isSuccessful) {
                     response.body()?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
@@ -197,10 +197,10 @@ class AgentViewModel @Inject constructor(
         }
         viewModelScope.launch {
             val newState = _state.value.permissions
-            settingsRepo.setString("agent_auto_fix", newState.autoFixErrors.toString())
-            settingsRepo.setString("agent_auto_retry", newState.autoRetry.toString())
-            settingsRepo.setString("agent_optimize", newState.optimizeResources.toString())
-            settingsRepo.setString("agent_access", newState.accessProjects.toString())
+            appSettingsRepo.setString("agent_auto_fix", newState.autoFixErrors.toString())
+            appSettingsRepo.setString("agent_auto_retry", newState.autoRetry.toString())
+            appSettingsRepo.setString("agent_optimize", newState.optimizeResources.toString())
+            appSettingsRepo.setString("agent_access", newState.accessProjects.toString())
         }
     }
 
@@ -209,7 +209,7 @@ class AgentViewModel @Inject constructor(
             state.copy(permissions = state.permissions.copy(maxInterventionDepth = depth))
         }
         viewModelScope.launch {
-            settingsRepo.setString("agent_depth", depth.toString())
+            appSettingsRepo.setString("agent_depth", depth.toString())
             agentOrchestrator.updateMaxDepth(depth)
         }
     }
