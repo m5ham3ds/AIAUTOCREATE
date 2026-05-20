@@ -234,17 +234,20 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DynamicModelSelectionSection(state: ModelsSettingsState, viewModel: ModelsSettingsViewModel) {
-    val categories = listOf(
-        "image" to "نموذج توليد الصور",
-        "video" to "نموذج تحويل الصورة إلى فيديو",
-        "tts" to "نموذج تحويل النص إلى صوت",
-        "analysis" to "نموذج التحليل والمعالجة",
-        "reviewer" to "نموذج مراجعة وتصحيح",
-        "orchestrator" to "نموذج التنسيق العام",
-        "music" to "نموذج توليد موسيقى",
-        "transition" to "نموذج الانتقالات",
-        "subtitle" to "نموذج الترجمة"
-    )
+    // داخل DynamicModelSelectionSection, استبدل قائمة categories بالقائمة التالية:
+val categories = listOf(
+    "text" to "نموذج نصوص",
+    "image" to "نموذج توليد الصور",
+    "video" to "نموذج تحويل الصورة إلى فيديو",
+    "tts" to "نموذج تحويل النص إلى صوت",
+    "analysis" to "نموذج التحليل والمعالجة",
+    "reviewer" to "نموذج مراجعة وتصحيح",
+    "orchestrator" to "نموذج التنسيق العام",
+    "music" to "نموذج توليد موسيقى",
+    "transition" to "نموذج الانتقالات",
+    "subtitle" to "نموذج الترجمة",
+    "ffmpeg" to "نموذج أوامر FFmpeg"
+)
 
     Box(
         modifier = Modifier
