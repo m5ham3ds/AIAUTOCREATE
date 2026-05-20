@@ -280,5 +280,5 @@ class ModelsManagerViewModel @Inject constructor(
         "translation" -> "subtitle"  // أو "text" حسب رغبتك
         else -> "analysis"
     }
-}
+  }
 }
