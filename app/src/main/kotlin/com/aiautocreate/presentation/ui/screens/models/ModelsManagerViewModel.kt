@@ -1,11 +1,12 @@
 package com.aiautocreate.presentation.ui.screens.models
 
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aiautocreate.data.datasource.local.datastore.DataStoreManager
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.response.HfModelInfo
 import com.aiautocreate.domain.model.ModelConfig
-import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.domain.usecase.model.CheckApiModelsUseCase
 import com.aiautocreate.domain.usecase.model.ManageModelsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,7 +20,7 @@ class ModelsManagerViewModel @Inject constructor(
     private val manageModelsUseCase: ManageModelsUseCase,
     private val checkApiModelsUseCase: CheckApiModelsUseCase,
     private val huggingFaceApi: HuggingFaceApi,
-    private val settingsRepository: ISettingsRepository
+    private val dataStoreManager: DataStoreManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -69,7 +70,8 @@ class ModelsManagerViewModel @Inject constructor(
     // ==================== دوال إضافة النموذج ====================
 
     private suspend fun getHuggingFaceToken(): String {
-        return settingsRepository.getString("hf_token", "") ?: ""
+        val preferences = dataStoreManager.dataStore.data.first()
+        return preferences[stringPreferencesKey("hf_token")] ?: ""
     }
 
     fun onSearchQueryChanged(query: String) {
@@ -97,7 +99,7 @@ class ModelsManagerViewModel @Inject constructor(
                         customDescription = modelInfo.cardData?.description ?: "لا يوجد وصف متاح",
                         isEnabled = true,
                         category = guessCategoryFromPipelineTag(modelInfo.pipelineTag),
-                        settingsUrl = "",  // هذا الحقل سيصبح "رابط النموذج" في المستقبل
+                        settingsUrl = "",
                         readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
                         supportedStyles = "",
                         supportsVoiceCloning = false
