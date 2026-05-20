@@ -16,11 +16,10 @@ class DefaultModelsInitializer @Inject constructor(
     fun initializeIfNeeded() {
         runBlocking {
             val existingModels = modelsRepository.getAllModelConfigs().first()
-            
-            val geminiExists = existingModels.any { it.modelId == "gemini-2.0-flash" }
-            val flanExists = existingModels.any { it.modelId == "google/flan-t5-base" }
+            Timber.d("عدد النماذج الموجودة: ${existingModels.size}")
 
-            // 1. نموذج Gemini (فئة النصوص) - أضفه إذا لم يكن موجوداً
+            // 1. نموذج Gemini (فئة النصوص)
+            val geminiExists = existingModels.any { it.modelId == "gemini-2.0-flash" }
             if (!geminiExists) {
                 val geminiModel = ModelConfig(
                     id = 0,
@@ -49,12 +48,13 @@ class DefaultModelsInitializer @Inject constructor(
                     createdAt = System.currentTimeMillis()
                 )
                 modelsRepository.insertModelConfig(geminiModel)
-                Timber.d("تم إضافة نموذج Gemini (لم يكن موجوداً)")
+                Timber.d("✅ تم إضافة نموذج Gemini بنجاح")
             } else {
-                Timber.d("نموذج Gemini موجود مسبقاً، تم تخطي الإضافة")
+                Timber.d("⚠️ نموذج Gemini موجود مسبقاً، تم تخطي الإضافة")
             }
 
-            // 2. نموذج Flan T5 Base (فئة التحليل) - أضفه إذا لم يكن موجوداً
+            // 2. نموذج Flan T5 Base (فئة التحليل)
+            val flanExists = existingModels.any { it.modelId == "google/flan-t5-base" }
             if (!flanExists) {
                 val hfAnalysisModel = ModelConfig(
                     id = 0,
@@ -73,9 +73,9 @@ class DefaultModelsInitializer @Inject constructor(
                     createdAt = System.currentTimeMillis()
                 )
                 modelsRepository.insertModelConfig(hfAnalysisModel)
-                Timber.d("تم إضافة نموذج Flan T5 Base (لم يكن موجوداً)")
+                Timber.d("✅ تم إضافة نموذج Flan T5 Base بنجاح")
             } else {
-                Timber.d("نموذج Flan T5 Base موجود مسبقاً، تم تخطي الإضافة")
+                Timber.d("⚠️ نموذج Flan T5 Base موجود مسبقاً، تم تخطي الإضافة")
             }
         }
     }
