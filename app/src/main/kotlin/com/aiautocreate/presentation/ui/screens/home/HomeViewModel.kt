@@ -29,14 +29,19 @@ class HomeViewModel @Inject constructor(
         checkConnection()
     }
 
-    private fun loadStylesAndSelections() {
+    // ✅ دالة عامة لإعادة تحميل القوائم (يتم استدعاؤها من الشاشة عند الظهور)
+    fun loadStylesAndSelections() {
         viewModelScope.launch {
             try {
+                // 1. الأنماط الخاصة بالنماذج المختارة فقط (وليس كل النماذج)
                 val imageStyles = getSupportedStylesForCategory("image")
                 val videoStyles = getSupportedStylesForCategory("video")
                 val ttsOptions = getSupportedStylesForCategory("tts")
-                val montageStyles = getMontageStylesFromModels()
 
+                // 2. أنماط المونتاج من إعدادات FFmpeg (المخزنة في CSV)
+                val montageStyles = getMontageStylesFromSettings()
+
+                // 3. قراءة القيم المختارة حالياً من التخزين
                 val selImage = settingsRepo.getStringOnce("sel_image_style", imageStyles.firstOrNull() ?: "واقعي")
                 val selCover = settingsRepo.getStringOnce("sel_cover_style", "غلاف بسيط")
                 val selVoice = settingsRepo.getStringOnce("sel_voice", ttsOptions.firstOrNull() ?: "صوت1")
@@ -45,9 +50,9 @@ class HomeViewModel @Inject constructor(
 
                 _state.update {
                     it.copy(
-                        imageStyles = imageStyles.ifEmpty { listOf("واقعي") },
+                        imageStyles = imageStyles.ifEmpty { listOf("لا توجد أنماط") },
                         coverStyles = listOf("غلاف بسيط", "غلاف عصري", "غلاف سينمائي"),
-                        videoStyles = videoStyles.ifEmpty { listOf("درامي") },
+                        videoStyles = videoStyles.ifEmpty { listOf("لا توجد أنماط") },
                         montageStyles = montageStyles.ifEmpty { listOf("قصص وروايات", "حماسي وجذاب", "احترافية وأنيق", "مخصص") },
                         voiceOptions = ttsOptions.ifEmpty { listOf("صوت1", "صوت2", "استنساخ العينة") },
                         selectedImageStyle = selImage,
@@ -64,24 +69,19 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // ✅ جلب الأنماط المدعومة من النموذج المحدد فقط (يتم اختياره من إعدادات النماذج)
     private suspend fun getSupportedStylesForCategory(category: String): List<String> {
+        val selectedModelId = settingsRepo.getSelectedModelForCategory(category)
+        if (selectedModelId.isBlank()) return emptyList()
         val allModels = modelsRepo.getAllModelConfigs().first()
-        val enabledModels = allModels.filter { it.isEnabled && it.category.equals(category, ignoreCase = true) }
-        val allStyles = enabledModels.flatMap { it.supportedStyles ?: emptyList() }
-        return allStyles.distinct().sorted()
+        val model = allModels.find { it.modelId == selectedModelId && it.isEnabled }
+        return model?.supportedStyles ?: emptyList()
     }
 
-    private suspend fun getMontageStylesFromModels(): List<String> {
-        val allModels = modelsRepo.getAllModelConfigs().first()
-        val relevantModels = allModels.filter {
-            it.isEnabled && (it.category.equals("analysis", ignoreCase = true) ||
-                    it.category.equals("text", ignoreCase = true) ||
-                    it.pipelineTag.contains("text-generation", ignoreCase = true))
-        }
-        val styles = relevantModels.flatMap { it.supportedStyles ?: emptyList() }
-        return if (styles.isNotEmpty()) styles.distinct().sorted() else listOf(
-            "قصص وروايات", "حماسي وجذاب", "احترافية وأنيق", "مخصص"
-        )
+    // ✅ جلب أنماط المونتاج من إعدادات FFmpeg (المخزنة في CSV)
+    private suspend fun getMontageStylesFromSettings(): List<String> {
+        val csv = settingsRepo.getStringOnce("montage_styles_csv", "قصص وروايات,حماسي وجذاب,احترافية وأنيق,مخصص")
+        return settingsRepo.csvToList(csv)
     }
 
     private fun checkConnection() {
@@ -159,7 +159,6 @@ class HomeViewModel @Inject constructor(
         }
         if (s.isProcessing) return
 
-        // ✅ إضافة فحص الاتصال بالإنترنت
         if (!NetworkUtils.isOnline(AIAutoCreateApp.instance)) {
             _state.update {
                 it.copy(
@@ -246,7 +245,6 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
-            
 
     fun clearError() {
         _state.update { it.copy(errorMessage = null) }
