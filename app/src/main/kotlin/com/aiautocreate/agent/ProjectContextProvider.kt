@@ -16,9 +16,6 @@ class ProjectContextProvider @Inject constructor(
     private val settingsRepo: AppSettingsRepository
 ) {
 
-    /**
-     * جلب السياق الكامل للتطبيق (للوكيل)
-     */
     suspend fun getFullContext(): String {
         val projects = projectRepo.getAllProjects().first()
         val enabledModels = modelsRepo.getEnabledModels().first()
@@ -34,11 +31,11 @@ class ProjectContextProvider @Inject constructor(
 
         return buildString {
             appendLine("=== معلومات المشروع ===")
-            appendLine("إجمالي المشاريع: ${projects.size}")
+            appendLine("عدد المشاريع: ${projects.size}")
             if (projects.isNotEmpty()) {
                 appendLine("أحدث المشاريع:")
-                projects.take(5).forEach { proj ->
-                    appendLine("- ${proj.title} (الحالة: ${proj.status}, آخر تحديث: ${proj.updatedAt})")
+                projects.take(3).forEach { proj ->
+                    appendLine("- ${proj.title} (الحالة: ${proj.status})")
                 }
             }
 
@@ -50,7 +47,7 @@ class ProjectContextProvider @Inject constructor(
                 if (model != null) {
                     appendLine("- $cat → ${model.modelName} (${model.modelId})")
                 } else {
-                    appendLine("- $cat → $modelId (⚠️ غير موجود في القائمة النشطة)")
+                    appendLine("- $cat → $modelId (⚠️ غير موجود)")
                 }
             }
 
@@ -64,14 +61,11 @@ class ProjectContextProvider @Inject constructor(
                     appendLine("✗ [${log.type}] ${log.title}: ${log.description.take(100)}")
                 }
             } else {
-                appendLine("لا توجد أخطاء حديثة. كل شيء يعمل بشكل جيد.")
+                appendLine("لا توجد أخطاء حديثة.")
             }
         }
     }
 
-    /**
-     * إحصائيات موجزة لعرضها في تبويب "الإحصائيات"
-     */
     suspend fun getStats(): AgentStats {
         val projects = projectRepo.getAllProjects().first()
         val models = modelsRepo.getAllModelConfigs().first()
@@ -89,14 +83,6 @@ class ProjectContextProvider @Inject constructor(
             lastActivityTimestamp = lastRun?.timestamp ?: 0,
             lastActivityTitle = lastRun?.title ?: "لا يوجد نشاط"
         )
-    }
-
-    /**
-     * جلب العمليات الجارية (سيتم توسيعها لاحقاً عند ربط PipelineOrchestrator)
-     */
-    suspend fun getRunningOperations(): List<String> {
-        // TODO: ربط PipelineOrchestrator للحصول على العمليات الجارية
-        return emptyList()
     }
 }
 
