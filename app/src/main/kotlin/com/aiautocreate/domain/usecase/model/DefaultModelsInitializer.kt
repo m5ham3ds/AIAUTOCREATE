@@ -4,6 +4,7 @@ import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,19 +13,15 @@ class DefaultModelsInitializer @Inject constructor(
     private val modelsRepository: IModelsRepository
 ) {
 
-    /**
-     * يجب استدعاء هذه الدالة عند بدء التشغيل (في `Application` أو `SplashScreen`).
-     * تقوم بإضافة النماذج الافتراضية إذا لم يكن هناك أي نموذج في قاعدة البيانات.
-     */
     fun initializeIfNeeded() {
         runBlocking {
             val existingModels = modelsRepository.getAllModelConfigs().first()
             if (existingModels.isNotEmpty()) {
-                // يوجد نماذج بالفعل، لا داعي للإضافة
+                Timber.d("النماذج موجودة مسبقاً، عددها: ${existingModels.size}")
                 return@runBlocking
             }
 
-            // ✅ إضافة نموذج Gemini (Google) مع أنماط نصية افتراضية
+            // 1. نموذج Gemini (فئة النصوص)
             val geminiModel = ModelConfig(
                 id = 0,
                 modelId = "gemini-2.0-flash",
@@ -35,7 +32,7 @@ class DefaultModelsInitializer @Inject constructor(
                 pipelineTag = "text-generation",
                 tags = listOf("google", "llm", "chat"),
                 modelUrl = "https://ai.google.dev/gemini-api",
-                category = "text",   // ✅ فئة النصوص
+                category = "text",
                 settingsUrl = "",
                 readmeUrl = "",
                 supportedStyles = listOf(
@@ -51,10 +48,10 @@ class DefaultModelsInitializer @Inject constructor(
                 parametersJson = null,
                 createdAt = System.currentTimeMillis()
             )
-            // ✅ إدراج نموذج Gemini في قاعدة البيانات (كانت هذه هي المشكلة الأساسية)
             modelsRepository.insertModelConfig(geminiModel)
+            Timber.d("تم إضافة نموذج Gemini")
 
-            // (اختياري) نموذج إضافي لتحليل النصوص من HuggingFace
+            // 2. نموذج Flan T5 Base (فئة التحليل)
             val hfAnalysisModel = ModelConfig(
                 id = 0,
                 modelId = "google/flan-t5-base",
@@ -72,6 +69,7 @@ class DefaultModelsInitializer @Inject constructor(
                 createdAt = System.currentTimeMillis()
             )
             modelsRepository.insertModelConfig(hfAnalysisModel)
+            Timber.d("تم إضافة نموذج Flan T5 Base")
         }
     }
 }
