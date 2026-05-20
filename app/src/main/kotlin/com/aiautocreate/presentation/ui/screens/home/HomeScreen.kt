@@ -31,6 +31,11 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // ✅ إعادة تحميل القوائم كلما ظهرت الشاشة (للتحديث التلقائي بعد تغيير النماذج أو أنماط المونتاج)
+    LaunchedEffect(Unit) {
+        viewModel.loadStylesAndSelections()
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -41,10 +46,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // مسافة علوية بسيطة للتباعد عن الهيدر
             Spacer(modifier = Modifier.height(Spacing.md))
 
-            // حالة الاتصال
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -75,7 +78,7 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold
                     )
 
-                    // ✅ قائمة الصور
+                    // ✅ قائمة الصور (أنماط النموذج المحدد للصور)
                     DropdownSelector(
                         label = state.selectedImageStyle,
                         options = state.imageStyles,
@@ -83,7 +86,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة الأغلفة
+                    // ✅ قائمة الأغلفة (ثابتة)
                     DropdownSelector(
                         label = state.selectedCoverStyle,
                         options = state.coverStyles,
@@ -91,7 +94,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة الأصوات
+                    // ✅ قائمة الأصوات (أنماط النموذج المحدد للنص إلى صوت)
                     DropdownSelector(
                         label = state.selectedVoice,
                         options = state.voiceOptions,
@@ -99,7 +102,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة أساليب الفيديو
+                    // ✅ قائمة أساليب الفيديو (أنماط النموذج المحدد للفيديو)
                     DropdownSelector(
                         label = state.selectedVideoStyle,
                         options = state.videoStyles,
@@ -107,7 +110,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة أساليب المونتاج
+                    // ✅ قائمة أساليب المونتاج (من إعدادات FFmpeg)
                     DropdownSelector(
                         label = state.selectedMontageStyle,
                         options = state.montageStyles,
@@ -195,7 +198,6 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(Spacing.sm))
             }
 
-            // مساحة سفلية لمنع تداخل المحتوى مع لوحة الإدخال
             Spacer(modifier = Modifier.height(ComponentSize.bottomBarHeight + Spacing.xl))
         }
 
