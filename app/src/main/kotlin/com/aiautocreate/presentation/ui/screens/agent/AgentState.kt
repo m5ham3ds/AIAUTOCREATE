@@ -1,9 +1,10 @@
 package com.aiautocreate.presentation.ui.screens.agent
 
+import com.aiautocreate.agent.AgentStats
 import java.util.UUID
 
 data class AgentState(
-    val selectedTab: Int = 0, // 0=Chat, 1=Interventions, 2=Permissions
+    val selectedTab: Int = 0, // 0=Chat, 1=Interventions, 2=Permissions, 3=Stats
 
     // Chat
     val chatMessages: List<ChatMessage> = emptyList(),
@@ -16,8 +17,15 @@ data class AgentState(
 
     // Permissions
     val permissions: AgentPermissions = AgentPermissions(),
+
+    // Stats
+    val stats: AgentStats? = null,
+    val isRefreshingStats: Boolean = false,
+
     val isLoading: Boolean = true
 )
+
+// باقي النماذج كما هي (ChatMessage, AgentIntervention, AgentPermissions)
 
 data class ChatMessage(
     val id: String,
