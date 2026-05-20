@@ -5,6 +5,7 @@ import com.aiautocreate.data.datasource.remote.api.generateText
 import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
+import com.aiautocreate.domain.repository.ISettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,14 +18,12 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// تعريف AgentInterventionLog موجود في نهاية الملف
-// لذلك لا حاجة لاستيراده
-
 @Singleton
 class AgentOrchestrator @Inject constructor(
     private val geminiApi: GeminiApi,
     private val modelsRepository: IModelsRepository,
-    private val settingsRepo: AppSettingsRepository
+    private val appSettingsRepo: AppSettingsRepository,
+    private val secureSettingsRepo: ISettingsRepository   // ✅ للحصول على مفتاح Gemini
 ) {
     private val _events = MutableSharedFlow<AgentEvent>()
     val events = _events.asSharedFlow()
@@ -33,13 +32,13 @@ class AgentOrchestrator @Inject constructor(
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            maxInterventionDepth = settingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
+            maxInterventionDepth = appSettingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
         }
     }
 
     suspend fun updateMaxDepth(depth: Int) {
         maxInterventionDepth = depth
-        settingsRepo.setString("agent_depth", depth.toString())
+        appSettingsRepo.setString("agent_depth", depth.toString())
     }
 
     suspend fun getCurrentMaxDepth(): Int = maxInterventionDepth
@@ -121,7 +120,14 @@ class AgentOrchestrator @Inject constructor(
 
     private suspend fun askGeminiForSuggestion(prompt: String): String? {
         return try {
-            val response = withTimeoutOrNull(5000L) { geminiApi.generateText(prompt) }
+            // ✅ الحصول على مفتاح Gemini من ISettingsRepository
+            val apiKey = secureSettingsRepo.getGeminiKey()
+            if (apiKey.isNullOrBlank()) {
+                Timber.e("Gemini API key not found")
+                return null
+            }
+            // استخدام دالة generateText التي تعتمد على المفتاح
+            val response = withTimeoutOrNull(5000L) { geminiApi.generateText(prompt, apiKey) }
             response?.trim()?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             Timber.e(e, "Gemini suggestion failed")
@@ -148,6 +154,7 @@ class AgentOrchestrator @Inject constructor(
     }
 }
 
+// تعريف البيانات المرفقة
 sealed class AgentEvent {
     data class AlternativeSuggested(val category: String, val originalModelId: String, val suggestedModelId: String, val suggestedModelName: String, val reason: String, val depth: Int) : AgentEvent()
     data class InterventionSkipped(val category: String, val reason: String, val depth: Int) : AgentEvent()
