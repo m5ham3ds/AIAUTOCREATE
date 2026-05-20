@@ -1,7 +1,6 @@
 package com.aiautocreate.agent
 
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
-import com.aiautocreate.data.datasource.remote.api.generateText
 import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
@@ -23,7 +22,7 @@ class AgentOrchestrator @Inject constructor(
     private val geminiApi: GeminiApi,
     private val modelsRepository: IModelsRepository,
     private val appSettingsRepo: AppSettingsRepository,
-    private val secureSettingsRepo: ISettingsRepository   // ✅ للحصول على مفتاح Gemini
+    private val secureSettingsRepo: ISettingsRepository   // ✅ حقن واجهة المفاتيح الآمنة
 ) {
     private val _events = MutableSharedFlow<AgentEvent>()
     val events = _events.asSharedFlow()
@@ -120,15 +119,25 @@ class AgentOrchestrator @Inject constructor(
 
     private suspend fun askGeminiForSuggestion(prompt: String): String? {
         return try {
-            // ✅ الحصول على مفتاح Gemini من ISettingsRepository
+            // ✅ الحصول على مفتاح Gemini من المستودع الآمن
             val apiKey = secureSettingsRepo.getGeminiKey()
             if (apiKey.isNullOrBlank()) {
                 Timber.e("Gemini API key not found")
                 return null
             }
-            // استخدام دالة generateText التي تعتمد على المفتاح
-            val response = withTimeoutOrNull(5000L) { geminiApi.generateText(prompt, apiKey) }
-            response?.trim()?.takeIf { it.isNotBlank() }
+            // ✅ استخدام الدالة التي تستقبل المفتاح صراحة (نقوم بتعديل الاستدعاء هنا)
+            val request = com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto(
+                contents = listOf(
+                    com.aiautocreate.data.datasource.remote.dto.request.Content(
+                        parts = listOf(
+                            com.aiautocreate.data.datasource.remote.dto.request.Part(text = prompt)
+                        )
+                    )
+                )
+            )
+            val response = withTimeoutOrNull(5000L) { geminiApi.generateContent(apiKey, request) }
+            val result = response?.body()?.candidates?.firstOrNull()?.content?.parts?.joinToString(" ") { it.text ?: "" }
+            result?.trim()?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             Timber.e(e, "Gemini suggestion failed")
             null
@@ -154,7 +163,6 @@ class AgentOrchestrator @Inject constructor(
     }
 }
 
-// تعريف البيانات المرفقة
 sealed class AgentEvent {
     data class AlternativeSuggested(val category: String, val originalModelId: String, val suggestedModelId: String, val suggestedModelName: String, val reason: String, val depth: Int) : AgentEvent()
     data class InterventionSkipped(val category: String, val reason: String, val depth: Int) : AgentEvent()
