@@ -13,43 +13,52 @@ interface HuggingFaceApi {
     @POST("models/{model}")
     suspend fun generateImage(
         @Path("model") model: String,
-        @Body request: HfImageRequestDto
+        @Body request: HfImageRequestDto,
+        @Header("Authorization") authorization: String = ""
     ): Response<ResponseBody>
 
     @POST("models/{model}")
     suspend fun generateSpeech(
         @Path("model") model: String,
-        @Body request: HfTtsRequestDto
+        @Body request: HfTtsRequestDto,
+        @Header("Authorization") authorization: String = ""
     ): Response<ResponseBody>
 
     @POST("models/{model}")
     suspend fun generateClonedSpeech(
         @Path("model") model: String,
-        @Body request: HfTtsRequestDto
+        @Body request: HfTtsRequestDto,
+        @Header("Authorization") authorization: String = ""
     ): Response<ResponseBody>
 
     @POST("models/{model}")
     suspend fun postRawAudio(
         @Path("model") model: String,
-        @Body audio: RequestBody
+        @Body audio: RequestBody,
+        @Header("Authorization") authorization: String = ""
     ): Response<ResponseBody>
 
     @POST("models/{model}")
     suspend fun imageToText(
         @Path("model") model: String,
-        @Body image: ByteArray?
+        @Body image: ByteArray?,
+        @Header("Authorization") authorization: String = ""
     ): Response<ResponseBody>
 
-    @GET("api/models/{modelId}")
+    // ✅ تعديل: استخدام URL كامل لأن base URL خاص بالـ inference، لكن معلومات النموذج تأتي من huggingface.co/api
+    @GET("https://huggingface.co/api/models/{modelId}")
     suspend fun getModelInfo(
-        @Path("modelId") modelId: String
+        @Path("modelId") modelId: String,
+        @Header("Authorization") authorization: String = ""
     ): Response<HfModelInfo>
     
-    @GET("api/models")
+    // ✅ تعديل: نفس الشيء للبحث
+    @GET("https://huggingface.co/api/models")
     suspend fun searchModelsByCategory(
         @Query("pipeline_tag") pipelineTag: String,
         @Query("limit") limit: Int = 50,
         @Query("sort") sort: String = "downloads",
-        @Query("direction") direction: String = "-1"
+        @Query("direction") direction: String = "-1",
+        @Header("Authorization") authorization: String = ""
     ): Response<List<HfModelInfo>>
 }
