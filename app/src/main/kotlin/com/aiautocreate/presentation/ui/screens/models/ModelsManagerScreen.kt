@@ -98,6 +98,7 @@ fun ModelsManagerScreen(
             }
         }
 
+        // ✅ زر الإضافة ينتقل إلى تبويب الإضافة بدلاً من حوار
         FloatingActionButton(
             onClick = { selectedTab = "add" },
             modifier = Modifier
@@ -526,7 +527,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
-// ✅ بطاقة النموذج المحسّنة (مع حوار احترافي)
+// ✅ بطاقة النموذج المحسّنة مع حوار احترافي
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelManagerCard(
@@ -537,7 +538,6 @@ private fun ModelManagerCard(
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // قائمة الفئات المتاحة
     val categories = listOf(
         "image" to "توليد الصور",
         "video" to "تحويل الصورة إلى فيديو",
@@ -585,7 +585,6 @@ private fun ModelManagerCard(
                         Text("الفئة: ${categories.find { it.first == model.category }?.second ?: model.category}", color = TextHint, fontSize = AppFontSize.caption)
                     }
                 }
-                // عرض حالة التفعيل بأيقونة ونص
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -635,7 +634,7 @@ private fun ModelManagerCard(
         }
     }
 
-    // ✅ حوار تعديل النموذج المحسن (مع قائمة منسدلة و Switch)
+    // حوار تعديل النموذج المحسّن
     if (showSettingsDialog) {
         var editedName by remember { mutableStateOf(model.modelName) }
         var editedCategory by remember { mutableStateOf(model.category) }
@@ -662,7 +661,6 @@ private fun ModelManagerCard(
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // اسم النموذج
                     OutlinedTextField(
                         value = editedName,
                         onValueChange = { editedName = it },
@@ -677,14 +675,7 @@ private fun ModelManagerCard(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // الفئة (قائمة منسدلة)
-                    Text(
-                        "الفئة",
-                        color = TextHint,
-                        fontSize = AppFontSize.bodyMedium,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End
-                    )
+                    Text("الفئة", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(modifier = Modifier.height(Spacing.xs))
                     ExposedDropdownMenuBox(
                         expanded = categoryExpanded,
@@ -727,7 +718,6 @@ private fun ModelManagerCard(
                     }
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // تفعيل النموذج (Switch)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -747,7 +737,6 @@ private fun ModelManagerCard(
                     }
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // رابط النموذج (تم تغيير التسمية)
                     OutlinedTextField(
                         value = editedModelUrl,
                         onValueChange = { editedModelUrl = it },
@@ -763,7 +752,6 @@ private fun ModelManagerCard(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // رابط README
                     OutlinedTextField(
                         value = editedReadmeUrl,
                         onValueChange = { editedReadmeUrl = it },
@@ -789,9 +777,7 @@ private fun ModelManagerCard(
                             settingsUrl = editedModelUrl,
                             readmeUrl = editedReadmeUrl
                         )
-                        scope.launch {
-                            viewModel.updateModel(updatedModel)
-                        }
+                        scope.launch { viewModel.updateModel(updatedModel) }
                         showSettingsDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
@@ -801,11 +787,8 @@ private fun ModelManagerCard(
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { showSettingsDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = TextHint)
-                ) {
-                    Text("إلغاء")
+                TextButton(onClick = { showSettingsDialog = false }) {
+                    Text("إلغاء", color = TextHint)
                 }
             },
             containerColor = CardPrimary,
@@ -814,7 +797,6 @@ private fun ModelManagerCard(
         )
     }
 
-    // حوار تأكيد الحذف (بدون تغيير)
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
