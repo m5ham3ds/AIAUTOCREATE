@@ -52,10 +52,8 @@ fun AgentScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // مسافة علوية بسيطة للتباعد عن الهيدر
             Spacer(modifier = Modifier.height(Spacing.md))
 
-            // وصف الخدمة
             Text(
                 "مركز التحكم والمراقبة الذكي للمشروع",
                 Modifier
@@ -68,7 +66,7 @@ fun AgentScreen(
 
             Spacer(Modifier.height(Spacing.md))
 
-            // التبويبات
+            // التبويبات: الدردشة، سجل التدخلات، الصلاحيات، الإحصائيات
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,18 +76,17 @@ fun AgentScreen(
                 AgentTab("الدردشة", 0, state.selectedTab) { viewModel.onTabSelected(0) }
                 AgentTab("سجل التدخلات", 1, state.selectedTab) { viewModel.onTabSelected(1) }
                 AgentTab("الصلاحيات", 2, state.selectedTab) { viewModel.onTabSelected(2) }
+                AgentTab("الإحصائيات", 3, state.selectedTab) { viewModel.onTabSelected(3) }
             }
 
             Spacer(Modifier.height(Spacing.md))
 
-            // محتوى التبويب
             when (state.selectedTab) {
                 0 -> ChatTab(state, viewModel, listState)
                 1 -> InterventionsTab(state)
                 2 -> PermissionsTab(state, viewModel)
+                3 -> StatsTab(state, viewModel)
             }
-
-            // ✅ تم إزالة Spacer السفلي الثابت (يتم ضبطه عبر Scaffold في MainActivity)
         }
     }
 }
@@ -273,13 +270,13 @@ private fun InterventionCard(intervention: AgentIntervention) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.xl))
             .background(CardPrimary)
-            .padding(Spacing.md) // ✅ تقليل padding الداخلي من Spacing.lg إلى Spacing.md
+            .padding(Spacing.md)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Icon(
                 painterResource(statusIcon),
                 intervention.status,
-                Modifier.size(IconSize.md), // ✅ تصغير حجم الأيقونة من lg إلى md
+                Modifier.size(IconSize.md),
                 tint = statusColor
             )
             Spacer(Modifier.width(Spacing.md))
@@ -287,7 +284,7 @@ private fun InterventionCard(intervention: AgentIntervention) {
                 Text(
                     intervention.title,
                     color = TextPrimary,
-                    fontSize = AppFontSize.titleSmall, // ✅ تصغير من bodyMedium إلى titleSmall
+                    fontSize = AppFontSize.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(Spacing.xs))
@@ -370,7 +367,7 @@ private fun PermissionRow(iconRes: Int, title: String, checked: Boolean, onToggl
             Icon(
                 painterResource(iconRes),
                 title,
-                Modifier.size(IconSize.lg), // ✅ تصغير من xl إلى lg
+                Modifier.size(IconSize.lg),
                 tint = if (checked) PrimaryLight else TextHint
             )
             Spacer(Modifier.width(Spacing.md))
@@ -378,7 +375,7 @@ private fun PermissionRow(iconRes: Int, title: String, checked: Boolean, onToggl
                 title,
                 Modifier.weight(1f),
                 color = TextPrimary,
-                fontSize = AppFontSize.titleSmall, // ✅ تصغير من bodyMedium إلى titleSmall
+                fontSize = AppFontSize.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             Switch(
@@ -393,4 +390,76 @@ private fun PermissionRow(iconRes: Int, title: String, checked: Boolean, onToggl
             )
         }
     }
+}
+
+// ✅ تبويب الإحصائيات الجديد
+@Composable
+private fun StatsTab(state: AgentState, viewModel: AgentViewModel) {
+    val stats = state.stats
+    if (state.isRefreshingStats) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Primary)
+        }
+        return
+    }
+    if (stats == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("لا توجد إحصائيات متاحة", color = TextHint)
+                Spacer(Modifier.height(Spacing.md))
+                Button(onClick = { viewModel.onTabSelected(3) }) {
+                    Text("تحديث")
+                }
+            }
+        }
+        return
+    }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+    ) {
+        Card(colors = CardDefaults.cardColors(containerColor = CardPrimary)) {
+            Column(modifier = Modifier.padding(Spacing.lg)) {
+                Text("📊 إحصائيات المشروع", fontWeight = FontWeight.Bold, fontSize = AppFontSize.headlineSmall)
+                Spacer(Modifier.height(Spacing.md))
+                StatItem("عدد المشاريع", stats.projectCount.toString())
+                StatItem("النماذج النشطة", "${stats.activeModelCount} / ${stats.totalModelCount}")
+                StatItem("إجمالي النشاطات", stats.totalLogs.toString())
+                StatItem("العمليات الناجحة", stats.successCount.toString(), SuccessGreen)
+                StatItem("الأخطاء", stats.errorCount.toString(), ErrorRed)
+                StatItem("آخر نشاط", formatTimestamp(stats.lastActivityTimestamp))
+                StatItem("عنوان آخر نشاط", stats.lastActivityTitle.take(50))
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+
+        Button(
+            onClick = { viewModel.onTabSelected(0) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryLight)
+        ) {
+            Text("💬 اذهب إلى الدردشة واسأل عن التفاصيل")
+        }
+    }
+}
+
+@Composable
+private fun StatItem(label: String, value: String, color: Color = TextPrimary) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = TextHint, fontSize = AppFontSize.bodyMedium)
+        Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = AppFontSize.bodyMedium)
+    }
+}
+
+private fun formatTimestamp(timestamp: Long): String {
+    if (timestamp == 0L) return "غير متوفر"
+    val sdf = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", java.util.Locale.getDefault())
+    return sdf.format(java.util.Date(timestamp))
 }
