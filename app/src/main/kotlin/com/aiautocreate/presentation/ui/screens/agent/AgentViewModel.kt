@@ -4,12 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aiautocreate.AIAutoCreateApp
 import com.aiautocreate.agent.AgentEvent
-import com.aiautocreate.agent.AgentInterventionLog
 import com.aiautocreate.agent.AgentOrchestrator
-import com.aiautocreate.data.datasource.remote.api.GeminiApi
-import com.aiautocreate.data.datasource.remote.dto.request.Content
-import com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto
-import com.aiautocreate.data.datasource.remote.dto.request.Part
+import com.aiautocreate.agent.ProjectContextProvider
 import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.util.NetworkUtils
@@ -21,10 +17,10 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AgentViewModel @Inject constructor(
-    private val appSettingsRepo: AppSettingsRepository,           // للإعدادات العامة
-    private val secureSettingsRepo: ISettingsRepository,          // ✅ للمفاتيح الآمنة
-    private val geminiApi: GeminiApi,
-    private val agentOrchestrator: AgentOrchestrator
+    private val appSettingsRepo: AppSettingsRepository,
+    private val secureSettingsRepo: ISettingsRepository,
+    private val agentOrchestrator: AgentOrchestrator,
+    private val contextProvider: ProjectContextProvider
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AgentState())
@@ -34,6 +30,7 @@ class AgentViewModel @Inject constructor(
         loadPermissions()
         loadWelcomeMessage()
         observeAgentEvents()
+        loadStats()
     }
 
     private fun observeAgentEvents() {
@@ -50,6 +47,7 @@ class AgentViewModel @Inject constructor(
                             timestamp = System.currentTimeMillis()
                         )
                         _state.update { it.copy(interventions = listOf(intervention) + it.interventions) }
+                        loadStats()
                     }
                     is AgentEvent.InterventionSkipped -> {
                         val intervention = AgentIntervention(
@@ -61,6 +59,7 @@ class AgentViewModel @Inject constructor(
                             timestamp = System.currentTimeMillis()
                         )
                         _state.update { it.copy(interventions = listOf(intervention) + it.interventions) }
+                        loadStats()
                     }
                     is AgentEvent.NoAlternatives -> {
                         val intervention = AgentIntervention(
@@ -72,6 +71,7 @@ class AgentViewModel @Inject constructor(
                             timestamp = System.currentTimeMillis()
                         )
                         _state.update { it.copy(interventions = listOf(intervention) + it.interventions) }
+                        loadStats()
                     }
                     is AgentEvent.InterventionLogged -> {
                         val intervention = AgentIntervention(
@@ -83,9 +83,18 @@ class AgentViewModel @Inject constructor(
                             timestamp = event.intervention.timestamp
                         )
                         _state.update { it.copy(interventions = listOf(intervention) + it.interventions) }
+                        loadStats()
                     }
                 }
             }
+        }
+    }
+
+    private fun loadStats() {
+        viewModelScope.launch {
+            _state.update { it.copy(isRefreshingStats = true) }
+            val stats = agentOrchestrator.refreshStats()
+            _state.update { it.copy(stats = stats, isRefreshingStats = false) }
         }
     }
 
@@ -113,6 +122,7 @@ class AgentViewModel @Inject constructor(
 
     fun onTabSelected(tab: Int) {
         _state.update { it.copy(selectedTab = tab) }
+        if (tab == 3) loadStats() // تحديث الإحصائيات عند فتح التبويب
     }
 
     fun onInputChanged(text: String) {
@@ -148,35 +158,14 @@ class AgentViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // ✅ استخدام ISettingsRepository للحصول على مفتاح Gemini
-                val apiKey = secureSettingsRepo.getGeminiKey()
-                if (apiKey.isNullOrBlank()) {
-                    _state.update {
-                        it.copy(
-                            isChatLoading = false,
-                            chatError = "مفتاح Gemini API غير موجود. يرجى إدخاله في إعدادات النماذج."
-                        )
-                    }
-                    return@launch
-                }
-
-                val request = GeminiRequestDto(
-                    contents = listOf(Content(parts = listOf(Part(text = text))))
-                )
-                val response = geminiApi.generateContent(apiKey, request)
-                val replyText = if (response.isSuccessful) {
-                    response.body()?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                        ?: "عذراً، لم أستطع فهم الرد."
-                } else {
-                    "فشل الاتصال بالخادم (${response.code()})"
-                }
-
+                val replyText = agentOrchestrator.getContextualAnswer(text)
                 val agentMessage = ChatMessage(
                     id = UUID.randomUUID().toString(),
                     text = replyText,
                     isUser = false
                 )
                 _state.update { it.copy(chatMessages = it.chatMessages + agentMessage, isChatLoading = false) }
+                loadStats()
             } catch (e: Exception) {
                 _state.update { it.copy(isChatLoading = false, chatError = "فشل الاتصال: ${e.message}") }
             }
@@ -212,5 +201,9 @@ class AgentViewModel @Inject constructor(
             appSettingsRepo.setString("agent_depth", depth.toString())
             agentOrchestrator.updateMaxDepth(depth)
         }
+    }
+
+    fun clearMessages() {
+        _state.update { it.copy(chatError = null) }
     }
 }
