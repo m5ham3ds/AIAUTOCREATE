@@ -42,13 +42,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideCertificatePinner(): CertificatePinner =
-        CertificatePinner.Builder()
-            .add("generativelanguage.googleapis.com", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-            .add("api-inference.huggingface.co", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-            .build()
+    fun provideCertificatePinner(): CertificatePinner {
+        // ✅ تعطيل pinning مؤقتاً لحل مشكلة الشهادة
+        return CertificatePinner.Builder().build()
+    }
 
-    // ** هذه الدالة كانت مفقودة، وهي السبب في كل أخطاء "MissingBinding" **
     @Provides
     @Singleton
     fun provideOkHttpClient(
@@ -63,7 +61,7 @@ object NetworkModule {
             .addInterceptor(errorHandlingInterceptor)
             .addInterceptor(retryInterceptor)
             .addInterceptor(loggingInterceptor)
-            .certificatePinner(certificatePinner)
+            .certificatePinner(certificatePinner)  // الآن لا يوجد pinning
             .connectTimeout(TIMEOUT_CONNECT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_READ_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_WRITE_SECONDS, TimeUnit.SECONDS)
