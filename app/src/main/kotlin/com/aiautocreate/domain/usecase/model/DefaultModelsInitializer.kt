@@ -4,7 +4,6 @@ import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,48 +14,36 @@ class DefaultModelsInitializer @Inject constructor(
 
     fun initializeIfNeeded() {
         runBlocking {
+            // 1. إضافة نموذج Gemini (فئة النصوص) - بالقوة
+            val geminiModel = ModelConfig(
+                id = 0,
+                modelId = "gemini-2.0-flash",
+                modelName = "Gemini 2.0 Flash",
+                provider = "google",
+                isEnabled = true,
+                description = "نموذج Gemini من Google لتوليد النصوص وتحليلها ومعالجة المهام المتعددة.",
+                pipelineTag = "text-generation",
+                tags = listOf("google", "llm", "chat"),
+                modelUrl = "https://ai.google.dev/gemini-api",
+                category = "text",
+                settingsUrl = "",
+                readmeUrl = "",
+                supportedStyles = listOf(
+                    "تحليل النصوص", "تلخيص", "توليد النصوص", "مراجعة", "تصحيح لغوي", "تنسيق عام"
+                ),
+                supportsVoiceCloning = false,
+                apiEndpoint = null,
+                parametersJson = null,
+                createdAt = System.currentTimeMillis()
+            )
+            // إدراج النموذج بغض النظر عن وجوده (REPLACE)
+            modelsRepository.insertModelConfig(geminiModel)
+
+            // 2. إضافة نموذج Flan T5 Base (فئة التحليل) - إذا لم يكن موجوداً
             val existingModels = modelsRepository.getAllModelConfigs().first()
-            Timber.d("عدد النماذج الموجودة: ${existingModels.size}")
-
-            // 1. نموذج Gemini (فئة النصوص)
-            val geminiExists = existingModels.any { it.modelId == "gemini-2.0-flash" }
-            if (!geminiExists) {
-                val geminiModel = ModelConfig(
-                    id = 0,
-                    modelId = "gemini-2.0-flash",
-                    modelName = "Gemini 2.0 Flash",
-                    provider = "google",
-                    isEnabled = true,
-                    description = "نموذج Gemini من Google لتوليد النصوص وتحليلها ومعالجة المهام المتعددة.",
-                    pipelineTag = "text-generation",
-                    tags = listOf("google", "llm", "chat"),
-                    modelUrl = "https://ai.google.dev/gemini-api",
-                    category = "text",
-                    settingsUrl = "",
-                    readmeUrl = "",
-                    supportedStyles = listOf(
-                        "تحليل النصوص",
-                        "تلخيص",
-                        "توليد النصوص",
-                        "مراجعة",
-                        "تصحيح لغوي",
-                        "تنسيق عام"
-                    ),
-                    supportsVoiceCloning = false,
-                    apiEndpoint = null,
-                    parametersJson = null,
-                    createdAt = System.currentTimeMillis()
-                )
-                modelsRepository.insertModelConfig(geminiModel)
-                Timber.d("✅ تم إضافة نموذج Gemini بنجاح")
-            } else {
-                Timber.d("⚠️ نموذج Gemini موجود مسبقاً، تم تخطي الإضافة")
-            }
-
-            // 2. نموذج Flan T5 Base (فئة التحليل)
             val flanExists = existingModels.any { it.modelId == "google/flan-t5-base" }
             if (!flanExists) {
-                val hfAnalysisModel = ModelConfig(
+                val flanModel = ModelConfig(
                     id = 0,
                     modelId = "google/flan-t5-base",
                     modelName = "Flan T5 Base",
@@ -72,10 +59,7 @@ class DefaultModelsInitializer @Inject constructor(
                     supportsVoiceCloning = false,
                     createdAt = System.currentTimeMillis()
                 )
-                modelsRepository.insertModelConfig(hfAnalysisModel)
-                Timber.d("✅ تم إضافة نموذج Flan T5 Base بنجاح")
-            } else {
-                Timber.d("⚠️ نموذج Flan T5 Base موجود مسبقاً، تم تخطي الإضافة")
+                modelsRepository.insertModelConfig(flanModel)
             }
         }
     }
