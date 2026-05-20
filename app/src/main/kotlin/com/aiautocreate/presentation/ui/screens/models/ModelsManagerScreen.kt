@@ -18,7 +18,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiautocreate.R
@@ -99,8 +98,9 @@ fun ModelsManagerScreen(
             }
         }
 
+        // ✅ تعديل: زر الإضافة الآن ينتقل إلى تبويب "إضافة نموذج" بدلاً من showAddDialog
         FloatingActionButton(
-            onClick = { viewModel.showAddDialog() },
+            onClick = { selectedTab = "add" },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(Spacing.xxl)
@@ -439,8 +439,8 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     OutlinedTextField(
                         value = state.editableModel.settingsUrl,
                         onValueChange = { viewModel.updateEditableSettingsUrl(it) },
-                        label = { Text("رابط الإعدادات (اختياري)") },
-                        placeholder = { Text("https://...") },
+                        label = { Text("رابط النموذج") },
+                        placeholder = { Text("https://huggingface.co/...") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -527,7 +527,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
-// ✅ بطاقة النموذج المعدلة (مع تمرير scope)
+// ✅ بطاقة النموذج المحسّنة (مع حوار احترافي)
 @Composable
 private fun ModelManagerCard(
     model: ModelConfig,
@@ -536,6 +536,19 @@ private fun ModelManagerCard(
 ) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // قائمة الفئات المتاحة
+    val categories = listOf(
+        "image" to "توليد الصور",
+        "video" to "تحويل الصورة إلى فيديو",
+        "tts" to "تحويل النص إلى صوت",
+        "analysis" to "تحليل ومعالجة",
+        "reviewer" to "مراجعة وتصحيح",
+        "orchestrator" to "تنسيق عام",
+        "music" to "توليد موسيقى",
+        "transition" to "انتقالات",
+        "subtitle" to "ترجمة"
+    )
 
     Box(
         modifier = Modifier
@@ -569,32 +582,32 @@ private fun ModelManagerCard(
                         Text(model.description.take(80), color = TextBody, fontSize = AppFontSize.bodySmall)
                     }
                     if (model.category.isNotEmpty()) {
-                        Text("الفئة: ${model.category}", color = TextHint, fontSize = AppFontSize.caption)
+                        Text("الفئة: ${categories.find { it.first == model.category }?.second ?: model.category}", color = TextHint, fontSize = AppFontSize.caption)
                     }
                 }
-                Box(
+                // عرض حالة التفعيل بأيقونة ونص
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .width(AppSpecific.statusLabelWidth)
                         .height(ComponentSize.buttonHeight)
                         .clip(RoundedCornerShape(Radius.round))
-                        .background(CardSecondary),
-                    contentAlignment = Alignment.Center
+                        .background(CardSecondary)
+                        .padding(horizontal = Spacing.sm)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (model.isEnabled) "نشط" else "متوقف",
-                            color = if (model.isEnabled) SuccessGreen else TextHint,
-                            fontSize = AppFontSize.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(Spacing.sm))
-                        Box(
-                            modifier = Modifier
-                                .size(Spacing.sm)
-                                .clip(RoundedCornerShape(Radius.round))
-                                .background(if (model.isEnabled) SuccessGreen else Color(0xFFFFD6D6))
-                        )
-                    }
+                    Icon(
+                        painter = painterResource(id = if (model.isEnabled) R.drawable.ic_check_circle else R.drawable.ic_cancel),
+                        contentDescription = null,
+                        modifier = Modifier.size(IconSize.sm),
+                        tint = if (model.isEnabled) SuccessGreen else ErrorRed
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    Text(
+                        text = if (model.isEnabled) "نشط" else "متوقف",
+                        color = if (model.isEnabled) SuccessGreen else TextHint,
+                        fontSize = AppFontSize.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(Spacing.lg))
@@ -622,58 +635,148 @@ private fun ModelManagerCard(
         }
     }
 
-    // ✅ حوار إعدادات النموذج
+    // ✅ حوار تعديل النموذج المحسن (مع قائمة منسدلة و Switch)
     if (showSettingsDialog) {
         var editedName by remember { mutableStateOf(model.modelName) }
         var editedCategory by remember { mutableStateOf(model.category) }
         var editedEnabled by remember { mutableStateOf(model.isEnabled) }
-        var editedSettingsUrl by remember { mutableStateOf(model.settingsUrl) }
+        var editedModelUrl by remember { mutableStateOf(model.settingsUrl) }
         var editedReadmeUrl by remember { mutableStateOf(model.readmeUrl) }
+        var categoryExpanded by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
-            title = { Text("تعديل النموذج") },
+            title = {
+                Text(
+                    "تعديل النموذج",
+                    color = TextPrimary,
+                    fontSize = AppFontSize.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // اسم النموذج
                     OutlinedTextField(
                         value = editedName,
                         onValueChange = { editedName = it },
                         label = { Text("اسم النموذج") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryLight,
+                            unfocusedBorderColor = BorderInput,
+                            cursorColor = PrimaryLight
+                        )
                     )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-                    OutlinedTextField(
-                        value = editedCategory,
-                        onValueChange = { editedCategory = it },
-                        label = { Text("الفئة") },
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // الفئة (قائمة منسدلة)
+                    Text(
+                        "الفئة",
+                        color = TextHint,
+                        fontSize = AppFontSize.bodyMedium,
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        textAlign = TextAlign.End
                     )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    ExposedDropdownMenuBox(
+                        expanded = categoryExpanded,
+                        onExpandedChange = { categoryExpanded = it }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ComponentSize.buttonHeightLg)
+                                .clip(RoundedCornerShape(Radius.lg))
+                                .background(CardInputDark)
+                                .menuAnchor()
+                                .clickable { categoryExpanded = true }
+                                .padding(horizontal = Spacing.lg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = categories.find { it.first == editedCategory }?.second ?: "اختر الفئة",
+                                color = TextPrimary,
+                                fontSize = AppFontSize.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        ExposedDropdownMenu(
+                            expanded = categoryExpanded,
+                            onDismissRequest = { categoryExpanded = false }
+                        ) {
+                            categories.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        editedCategory = value
+                                        categoryExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // تفعيل النموذج (Switch)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("تفعيل النموذج", color = TextPrimary, fontSize = AppFontSize.bodyMedium)
+                        Switch(
+                            checked = editedEnabled,
+                            onCheckedChange = { editedEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = PrimaryLight,
+                                checkedTrackColor = Primary.copy(alpha = 0.5f),
+                                uncheckedThumbColor = TextHint,
+                                uncheckedTrackColor = BorderInput
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // رابط النموذج (تم تغيير التسمية)
                     OutlinedTextField(
-                        value = editedSettingsUrl,
-                        onValueChange = { editedSettingsUrl = it },
-                        label = { Text("رابط الإعدادات (اختياري)") },
+                        value = editedModelUrl,
+                        onValueChange = { editedModelUrl = it },
+                        label = { Text("رابط النموذج") },
+                        placeholder = { Text("https://huggingface.co/...") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryLight,
+                            unfocusedBorderColor = BorderInput,
+                            cursorColor = PrimaryLight
+                        )
                     )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // رابط README
                     OutlinedTextField(
                         value = editedReadmeUrl,
                         onValueChange = { editedReadmeUrl = it },
                         label = { Text("رابط README") },
+                        placeholder = { Text("https://huggingface.co/.../README.md") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = editedEnabled,
-                            onCheckedChange = { editedEnabled = it }
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryLight,
+                            unfocusedBorderColor = BorderInput,
+                            cursorColor = PrimaryLight
                         )
-                        Text("النموذج مفعل", color = TextPrimary)
-                    }
+                    )
                 }
             },
             confirmButton = {
@@ -683,27 +786,35 @@ private fun ModelManagerCard(
                             modelName = editedName,
                             category = editedCategory,
                             isEnabled = editedEnabled,
-                            settingsUrl = editedSettingsUrl,
+                            settingsUrl = editedModelUrl,
                             readmeUrl = editedReadmeUrl
                         )
                         scope.launch {
                             viewModel.updateModel(updatedModel)
                         }
                         showSettingsDialog = false
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                    shape = RoundedCornerShape(Radius.xl)
                 ) {
-                    Text("حفظ")
+                    Text("حفظ التغييرات", color = TextPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSettingsDialog = false }) {
+                TextButton(
+                    onClick = { showSettingsDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = TextHint)
+                ) {
                     Text("إلغاء")
                 }
-            }
+            },
+            containerColor = CardPrimary,
+            titleContentColor = TextPrimary,
+            textContentColor = TextBody
         )
     }
 
-    // ✅ حوار تأكيد الحذف
+    // حوار تأكيد الحذف (بدون تغيير)
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
