@@ -255,13 +255,28 @@ class ModelsManagerViewModel @Inject constructor(
 
     // ==================== دوال مساعدة ====================
     private fun guessCategoryFromPipelineTag(tag: String?): String {
-        return when (tag?.lowercase()) {
-            "text-to-image", "image-to-image" -> "image"
-            "image-to-video", "video-generation" -> "video"
-            "text-to-speech", "audio-to-audio" -> "tts"
-            "automatic-speech-recognition" -> "analysis"
-            "text-generation", "text2text-generation" -> "analysis"
-            else -> "analysis"
-        }
+    return when (tag?.lowercase()) {
+        // نصوص (text)
+        "text-generation", "text2text-generation", "translation", "summarization",
+        "question-answering", "conversational", "text-to-text" -> "text"
+        // صور
+        "text-to-image", "image-to-image", "image-enhancement" -> "image"
+        // فيديو
+        "image-to-video", "video-generation", "text-to-video", "video-to-video" -> "video"
+        // صوت
+        "text-to-speech", "audio-to-audio", "text-to-audio" -> "tts"
+        // تحليل ومعالجة
+        "automatic-speech-recognition", "token-classification", "zero-shot-classification",
+        "sentence-similarity", "feature-extraction", "table-question-answering",
+        "fill-mask", "text-classification" -> "analysis"
+        // موسيقى
+        "text-to-music", "music-generation", "audio-generation" -> "music"
+        // انتقالات
+        "video-transition", "transition" -> "transition"
+        // أوامر FFmpeg
+        "code-generation", "command-generation", "text-to-bash", "shell-command",
+        "ffmpeg-command", "text-to-ffmpeg" -> "ffmpeg"
+        else -> "analysis"  // افتراضي
     }
+}
 }
