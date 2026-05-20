@@ -98,7 +98,6 @@ fun ModelsManagerScreen(
             }
         }
 
-        // ✅ تعديل: زر الإضافة الآن ينتقل إلى تبويب "إضافة نموذج" بدلاً من showAddDialog
         FloatingActionButton(
             onClick = { selectedTab = "add" },
             modifier = Modifier
@@ -528,6 +527,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
 }
 
 // ✅ بطاقة النموذج المحسّنة (مع حوار احترافي)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelManagerCard(
     model: ModelConfig,
