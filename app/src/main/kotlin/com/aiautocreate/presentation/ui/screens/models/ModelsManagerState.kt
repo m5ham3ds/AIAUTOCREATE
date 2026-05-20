@@ -7,14 +7,13 @@ data class ModelsManagerState(
     val models: List<ModelConfig> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
-    val showAddDialog: Boolean = false,
+    // val showAddDialog: Boolean = false,  // ✅ تمت إزالته
     val searchQuery: String = "",
     val isSearching: Boolean = false,
     val searchedModel: HfModelInfo? = null,
     val searchError: String? = null,
     val editableModel: EditableModel? = null,
     val isAdding: Boolean = false,
-    // ✅ حقول البحث حسب الفئة
     val categorySearchResults: List<HfModelInfo> = emptyList(),
     val isSearchingByCategory: Boolean = false,
     val selectedCategoryForSearch: String = "text-to-image"
