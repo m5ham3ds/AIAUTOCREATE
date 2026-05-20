@@ -1,162 +1,158 @@
 package com.aiautocreate.data.datasource.local.secure
 
 import androidx.security.crypto.EncryptedSharedPreferences
-import com.aiautocreate.data.datasource.local.secure.SecureStorageManager.Keys
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * مدير تخزين آمن للبيانات الحساسة (مفاتيح API، رموز، إلخ).
- * يستخدم [EncryptedSharedPreferences] مع MasterKey من Android KeyStore.
- *
- * @param encryptedPrefs مثيل [EncryptedSharedPreferences] مهيأ مسبقاً.
- */
 class SecureStorageManager(
     private val encryptedPrefs: EncryptedSharedPreferences
 ) {
 
-    /** المفاتيح المخزنة داخل التخزين المشفر */
     private object Keys {
+        // المفاتيح الأساسية
         const val GEMINI_API_KEY = "gemini_api_key"
         const val HUGGINGFACE_API_KEY = "huggingface_api_key"
+        
+        // المفاتيح الجديدة للإضافات
+        const val ELEVENLABS_API_KEY = "elevenlabs_api_key"
+        const val LOTSOFSOUNDS_API_KEY = "lotsofsounds_api_key"
+        const val OPENVFX_API_KEY = "openvfx_api_key"
+        const val PIXABAY_API_KEY = "pixabay_api_key"
+        const val PEXELS_API_KEY = "pexels_api_key"
+        const val FREESOUND_API_KEY = "freesound_api_key"
+        
+        // رموز إضافية
         const val REFRESH_TOKEN = "refresh_token"
         const val ACCESS_TOKEN = "access_token"
         const val HAS_BIOMETRIC_ENABLED = "has_biometric_enabled"
     }
 
-    // ========== مفاتيح API ==========
-
-    /**
-     * يحفظ مفتاح Gemini API بشكل آمن.
-     */
+    // ========== Gemini ==========
     fun saveGeminiApiKey(apiKey: String) {
-        encryptedPrefs.edit()
-            .putString(Keys.GEMINI_API_KEY, apiKey)
-            .apply()
+        encryptedPrefs.edit().putString(Keys.GEMINI_API_KEY, apiKey).apply()
     }
+    fun getGeminiApiKey(): String? = encryptedPrefs.getString(Keys.GEMINI_API_KEY, null)
 
-    /**
-     * يسترجع مفتاح Gemini API، أو null إذا لم يُخزّن بعد.
-     */
-    fun getGeminiApiKey(): String? {
-        return encryptedPrefs.getString(Keys.GEMINI_API_KEY, null)
-    }
-
-    /**
-     * يحفظ مفتاح HuggingFace API بشكل آمن.
-     */
+    // ========== HuggingFace ==========
     fun saveHuggingFaceApiKey(apiKey: String) {
-        encryptedPrefs.edit()
-            .putString(Keys.HUGGINGFACE_API_KEY, apiKey)
-            .apply()
+        encryptedPrefs.edit().putString(Keys.HUGGINGFACE_API_KEY, apiKey).apply()
     }
+    fun getHuggingFaceApiKey(): String? = encryptedPrefs.getString(Keys.HUGGINGFACE_API_KEY, null)
 
-    /**
-     * يسترجع مفتاح HuggingFace API، أو null إذا لم يُخزّن بعد.
-     */
-    fun getHuggingFaceApiKey(): String? {
-        return encryptedPrefs.getString(Keys.HUGGINGFACE_API_KEY, null)
+    // ========== ElevenLabs ==========
+    fun saveElevenLabsApiKey(key: String) {
+        encryptedPrefs.edit().putString(Keys.ELEVENLABS_API_KEY, key).apply()
     }
+    fun getElevenLabsApiKey(): String? = encryptedPrefs.getString(Keys.ELEVENLABS_API_KEY, null)
 
-    // ========== إدارة الرموز (Tokens) – اختياري للمستقبل ==========
+    // ========== LotsOfSounds ==========
+    fun saveLotsOfSoundsApiKey(key: String) {
+        encryptedPrefs.edit().putString(Keys.LOTSOFSOUNDS_API_KEY, key).apply()
+    }
+    fun getLotsOfSoundsApiKey(): String? = encryptedPrefs.getString(Keys.LOTSOFSOUNDS_API_KEY, null)
 
-    /**
-     * يحفظ رمز الوصول (Access Token) بشكل آمن.
-     */
+    // ========== OpenVFX ==========
+    fun saveOpenVfxApiKey(key: String) {
+        encryptedPrefs.edit().putString(Keys.OPENVFX_API_KEY, key).apply()
+    }
+    fun getOpenVfxApiKey(): String? = encryptedPrefs.getString(Keys.OPENVFX_API_KEY, null)
+
+    // ========== Pixabay ==========
+    fun savePixabayApiKey(key: String) {
+        encryptedPrefs.edit().putString(Keys.PIXABAY_API_KEY, key).apply()
+    }
+    fun getPixabayApiKey(): String? = encryptedPrefs.getString(Keys.PIXABAY_API_KEY, null)
+
+    // ========== Pexels ==========
+    fun savePexelsApiKey(key: String) {
+        encryptedPrefs.edit().putString(Keys.PEXELS_API_KEY, key).apply()
+    }
+    fun getPexelsApiKey(): String? = encryptedPrefs.getString(Keys.PEXELS_API_KEY, null)
+
+    // ========== Freesound ==========
+    fun saveFreesoundApiKey(key: String) {
+        encryptedPrefs.edit().putString(Keys.FREESOUND_API_KEY, key).apply()
+    }
+    fun getFreesoundApiKey(): String? = encryptedPrefs.getString(Keys.FREESOUND_API_KEY, null)
+
+    // ========== إدارة الرموز (Tokens) ==========
     fun saveAccessToken(token: String) {
-        encryptedPrefs.edit()
-            .putString(Keys.ACCESS_TOKEN, token)
-            .apply()
+        encryptedPrefs.edit().putString(Keys.ACCESS_TOKEN, token).apply()
     }
+    fun getAccessToken(): String? = encryptedPrefs.getString(Keys.ACCESS_TOKEN, null)
 
-    /**
-     * يسترجع رمز الوصول.
-     */
-    fun getAccessToken(): String? {
-        return encryptedPrefs.getString(Keys.ACCESS_TOKEN, null)
-    }
-
-    /**
-     * يحفظ رمز التحديث (Refresh Token) بشكل آمن.
-     */
     fun saveRefreshToken(token: String) {
-        encryptedPrefs.edit()
-            .putString(Keys.REFRESH_TOKEN, token)
-            .apply()
+        encryptedPrefs.edit().putString(Keys.REFRESH_TOKEN, token).apply()
     }
+    fun getRefreshToken(): String? = encryptedPrefs.getString(Keys.REFRESH_TOKEN, null)
 
-    /**
-     * يسترجع رمز التحديث.
-     */
-    fun getRefreshToken(): String? {
-        return encryptedPrefs.getString(Keys.REFRESH_TOKEN, null)
-    }
-
-    // ========== إعدادات الأمان ==========
-
-    /**
-     * تفعيل/تعطيل المصادقة البيومترية وحفظ الإعداد.
-     */
+    // ========== البيومترية ==========
     fun setBiometricEnabled(enabled: Boolean) {
-        encryptedPrefs.edit()
-            .putBoolean(Keys.HAS_BIOMETRIC_ENABLED, enabled)
-            .apply()
+        encryptedPrefs.edit().putBoolean(Keys.HAS_BIOMETRIC_ENABLED, enabled).apply()
     }
-
-    /**
-     * هل المصادقة البيومترية مفعلة؟
-     */
-    fun isBiometricEnabled(): Boolean {
-        return encryptedPrefs.getBoolean(Keys.HAS_BIOMETRIC_ENABLED, false)
-    }
+    fun isBiometricEnabled(): Boolean = encryptedPrefs.getBoolean(Keys.HAS_BIOMETRIC_ENABLED, false)
 
     // ========== دوال عامة ==========
-
-    /**
-     * يحذف مفتاحاً معيناً.
-     */
     fun removeKey(key: String) {
-        encryptedPrefs.edit()
-            .remove(key)
-            .apply()
+        encryptedPrefs.edit().remove(key).apply()
     }
 
-    /**
-     * يمسح **جميع** البيانات الحساسة المخزنة (سلة محو كامل).
-     * يُستخدم عند تسجيل الخروج الكامل أو حذف الحساب.
-     */
     fun clearAll() {
-        encryptedPrefs.edit()
-            .clear()
-            .apply()
+        encryptedPrefs.edit().clear().apply()
+        refreshKeysState()
     }
 
-    /**
-     * هل يوجد مفتاح API واحد على الأقل مخزن؟
-     */
     fun hasAnyApiKey(): Boolean {
-        return !getGeminiApiKey().isNullOrBlank() || !getHuggingFaceApiKey().isNullOrBlank()
+        return !getGeminiApiKey().isNullOrBlank() ||
+                !getHuggingFaceApiKey().isNullOrBlank() ||
+                !getElevenLabsApiKey().isNullOrBlank() ||
+                !getLotsOfSoundsApiKey().isNullOrBlank() ||
+                !getOpenVfxApiKey().isNullOrBlank() ||
+                !getPixabayApiKey().isNullOrBlank() ||
+                !getPexelsApiKey().isNullOrBlank() ||
+                !getFreesoundApiKey().isNullOrBlank()
     }
 
-    // ========== حالة تفاعلية (اختياري) ==========
-
+    // ========== حالة تفاعلية ==========
     private val _hasKeysState = MutableStateFlow(hasAnyApiKey())
     val hasKeysState: Flow<Boolean> = _hasKeysState.asStateFlow()
 
-    /** ينعش حالة `hasKeysState` بعد أي تغيير */
     private fun refreshKeysState() {
         _hasKeysState.value = hasAnyApiKey()
     }
 
-    /** دوال الحفظ المعدّلة لتنعش الحالة تلقائياً */
+    // دوال الحفظ المعدّلة لتنعش الحالة تلقائياً
     fun saveGeminiApiKeyAndRefresh(apiKey: String) {
         saveGeminiApiKey(apiKey)
         refreshKeysState()
     }
-
     fun saveHuggingFaceApiKeyAndRefresh(apiKey: String) {
         saveHuggingFaceApiKey(apiKey)
+        refreshKeysState()
+    }
+    fun saveElevenLabsApiKeyAndRefresh(key: String) {
+        saveElevenLabsApiKey(key)
+        refreshKeysState()
+    }
+    fun saveLotsOfSoundsApiKeyAndRefresh(key: String) {
+        saveLotsOfSoundsApiKey(key)
+        refreshKeysState()
+    }
+    fun saveOpenVfxApiKeyAndRefresh(key: String) {
+        saveOpenVfxApiKey(key)
+        refreshKeysState()
+    }
+    fun savePixabayApiKeyAndRefresh(key: String) {
+        savePixabayApiKey(key)
+        refreshKeysState()
+    }
+    fun savePexelsApiKeyAndRefresh(key: String) {
+        savePexelsApiKey(key)
+        refreshKeysState()
+    }
+    fun saveFreesoundApiKeyAndRefresh(key: String) {
+        saveFreesoundApiKey(key)
         refreshKeysState()
     }
 }
