@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.response.HfModelInfo
 import com.aiautocreate.domain.model.ModelConfig
+import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.domain.usecase.model.CheckApiModelsUseCase
 import com.aiautocreate.domain.usecase.model.ManageModelsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,7 +18,8 @@ import javax.inject.Inject
 class ModelsManagerViewModel @Inject constructor(
     private val manageModelsUseCase: ManageModelsUseCase,
     private val checkApiModelsUseCase: CheckApiModelsUseCase,
-    private val huggingFaceApi: HuggingFaceApi
+    private val huggingFaceApi: HuggingFaceApi,
+    private val settingsRepository: ISettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -57,7 +59,6 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    // ✅ دالة تحديث النموذج (غير suspend – تستخدم viewModelScope داخلياً)
     fun updateModel(model: ModelConfig) {
         viewModelScope.launch {
             manageModelsUseCase.updateModel(model)
@@ -67,34 +68,8 @@ class ModelsManagerViewModel @Inject constructor(
 
     // ==================== دوال إضافة النموذج ====================
 
-    fun showAddDialog() {
-        _state.update {
-            it.copy(
-                showAddDialog = true,
-                searchQuery = "",
-                searchedModel = null,
-                searchError = null,
-                editableModel = null,
-                isSearching = false,
-                categorySearchResults = emptyList(),
-                isSearchingByCategory = false
-            )
-        }
-    }
-
-    fun dismissAddDialog() {
-        _state.update {
-            it.copy(
-                showAddDialog = false,
-                searchQuery = "",
-                searchedModel = null,
-                searchError = null,
-                editableModel = null,
-                isSearching = false,
-                categorySearchResults = emptyList(),
-                isSearchingByCategory = false
-            )
-        }
+    private suspend fun getHuggingFaceToken(): String {
+        return settingsRepository.getString("hf_token", "") ?: ""
     }
 
     fun onSearchQueryChanged(query: String) {
@@ -110,7 +85,9 @@ class ModelsManagerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isSearching = true, searchError = null, searchedModel = null) }
             try {
-                val response = huggingFaceApi.getModelInfo(query)
+                val token = getHuggingFaceToken()
+                val authHeader = if (token.isNotBlank()) "Bearer $token" else ""
+                val response = huggingFaceApi.getModelInfo(query, authHeader)
                 if (response.isSuccessful && response.body() != null) {
                     val modelInfo = response.body()!!
                     val editable = EditableModel(
@@ -120,7 +97,7 @@ class ModelsManagerViewModel @Inject constructor(
                         customDescription = modelInfo.cardData?.description ?: "لا يوجد وصف متاح",
                         isEnabled = true,
                         category = guessCategoryFromPipelineTag(modelInfo.pipelineTag),
-                        settingsUrl = "",
+                        settingsUrl = "",  // هذا الحقل سيصبح "رابط النموذج" في المستقبل
                         readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
                         supportedStyles = "",
                         supportsVoiceCloning = false
@@ -135,6 +112,7 @@ class ModelsManagerViewModel @Inject constructor(
                     }
                 } else {
                     val errorMsg = when (response.code()) {
+                        401 -> "خطأ في المصادقة: تأكد من إدخال HuggingFace Token في الإعدادات"
                         404 -> "النموذج غير موجود في HuggingFace"
                         else -> "فشل البحث: ${response.code()}"
                     }
@@ -219,7 +197,7 @@ class ModelsManagerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isAdding = true) }
             manageModelsUseCase.addModel(modelConfig)
-            _state.update { it.copy(isAdding = false, showAddDialog = false) }
+            _state.update { it.copy(isAdding = false, searchedModel = null, editableModel = null, searchQuery = "") }
             loadModels()
         }
     }
@@ -234,9 +212,12 @@ class ModelsManagerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isSearchingByCategory = true, categorySearchResults = emptyList()) }
             try {
+                val token = getHuggingFaceToken()
+                val authHeader = if (token.isNotBlank()) "Bearer $token" else ""
                 val response = huggingFaceApi.searchModelsByCategory(
                     pipelineTag = _state.value.selectedCategoryForSearch,
-                    limit = 30
+                    limit = 30,
+                    authorization = authHeader
                 )
                 if (response.isSuccessful && response.body() != null) {
                     _state.update { it.copy(categorySearchResults = response.body()!!, isSearchingByCategory = false) }
