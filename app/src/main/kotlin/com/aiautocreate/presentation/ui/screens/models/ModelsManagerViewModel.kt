@@ -254,29 +254,31 @@ class ModelsManagerViewModel @Inject constructor(
     }
 
     // ==================== دوال مساعدة ====================
-    private fun guessCategoryFromPipelineTag(tag: String?): String {
+   private fun guessCategoryFromPipelineTag(tag: String?): String {
     return when (tag?.lowercase()) {
-        // نصوص (text)
+        // نصوص
         "text-generation", "text2text-generation", "translation", "summarization",
-        "question-answering", "conversational", "text-to-text" -> "text"
+        "question-answering", "conversational", "text-to-text", "fill-mask",
+        "zero-shot-classification", "sentence-similarity", "feature-extraction" -> "text"
         // صور
-        "text-to-image", "image-to-image", "image-enhancement" -> "image"
+        "text-to-image", "image-to-image", "image-enhancement", "image-segmentation",
+        "image-classification", "object-detection" -> "image"
         // فيديو
-        "image-to-video", "video-generation", "text-to-video", "video-to-video" -> "video"
-        // صوت
-        "text-to-speech", "audio-to-audio", "text-to-audio" -> "tts"
-        // تحليل ومعالجة
-        "automatic-speech-recognition", "token-classification", "zero-shot-classification",
-        "sentence-similarity", "feature-extraction", "table-question-answering",
-        "fill-mask", "text-classification" -> "analysis"
+        "image-to-video", "video-generation", "text-to-video", "video-to-video",
+        "video-classification" -> "video"
+        // صوت (TTS)
+        "text-to-speech", "text-to-audio", "audio-to-audio" -> "tts"
+        // تحليل ومعالجة (ASR وغيرها)
+        "automatic-speech-recognition", "audio-classification", "voice-activity-detection" -> "analysis"
         // موسيقى
         "text-to-music", "music-generation", "audio-generation" -> "music"
-        // انتقالات
+        // انتقالات (ليس شائعاً في HuggingFace، يترك افتراضياً)
         "video-transition", "transition" -> "transition"
-        // أوامر FFmpeg
-        "code-generation", "command-generation", "text-to-bash", "shell-command",
-        "ffmpeg-command", "text-to-ffmpeg" -> "ffmpeg"
-        else -> "analysis"  // افتراضي
+        // أوامر FFmpeg (نادر)
+        "code-generation", "command-generation", "text-to-bash", "shell-command" -> "ffmpeg"
+        // الترجمة (يمكن وضعها ضمن نصوص أو subtitle)
+        "translation" -> "subtitle"  // أو "text" حسب رغبتك
+        else -> "analysis"
     }
 }
 }
