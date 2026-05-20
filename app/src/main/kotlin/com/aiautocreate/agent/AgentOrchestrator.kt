@@ -22,7 +22,8 @@ class AgentOrchestrator @Inject constructor(
     private val geminiApi: GeminiApi,
     private val modelsRepository: IModelsRepository,
     private val appSettingsRepo: AppSettingsRepository,
-    private val secureSettingsRepo: ISettingsRepository   // ✅ حقن واجهة المفاتيح الآمنة
+    private val secureSettingsRepo: ISettingsRepository,
+    private val contextProvider: ProjectContextProvider   // ✅ إضافة السياق الجديد
 ) {
     private val _events = MutableSharedFlow<AgentEvent>()
     val events = _events.asSharedFlow()
@@ -117,15 +118,64 @@ class AgentOrchestrator @Inject constructor(
         emitEvent(AgentEvent.InterventionLogged(intervention))
     }
 
+    // ==================== دوال جديدة للسياق والإحصائيات ====================
+
+    /**
+     * يجيب على سؤال المستخدم باستخدام السياق الحالي للتطبيق
+     */
+    suspend fun getContextualAnswer(question: String): String {
+        val context = contextProvider.getFullContext()
+        val apiKey = secureSettingsRepo.getGeminiKey()
+        if (apiKey.isNullOrBlank()) {
+            return "عذراً، مفتاح Gemini API غير موجود. يرجى إدخاله في إعدادات النماذج."
+        }
+
+        val fullPrompt = """
+            أنت مساعد ذكي لتطبيق AI AutoCreate لتحرير الفيديو وإنشاء المحتوى.
+            إليك السياق الحالي للتطبيق:
+            
+            $context
+            
+            سؤال المستخدم: $question
+            
+            أجب بإيجاز وبشكل مفيد بناءً على السياق أعلاه. إذا كان السؤال عن خطأ معين، حاول تحليله واقتراح حل.
+            إذا كان السؤال عن إجراءات أو توصيات، قدم نصائح عملية.
+        """.trimIndent()
+
+        val request = com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto(
+            contents = listOf(
+                com.aiautocreate.data.datasource.remote.dto.request.Content(
+                    parts = listOf(
+                        com.aiautocreate.data.datasource.remote.dto.request.Part(text = fullPrompt)
+                    )
+                )
+            )
+        )
+        val response = withTimeoutOrNull(10000L) { geminiApi.generateContent(apiKey, request) }
+        return if (response?.isSuccessful == true) {
+            response.body()?.candidates?.firstOrNull()?.content?.parts?.joinToString(" ") { it.text ?: "" }
+                ?: "عذراً، لم أستطع معالجة الطلب."
+        } else {
+            "حدث خطأ في الاتصال: ${response?.code() ?: "timeout"}"
+        }
+    }
+
+    /**
+     * يجلب إحصائيات موجزة من الـ ProjectContextProvider
+     */
+    suspend fun refreshStats(): AgentStats {
+        return contextProvider.getStats()
+    }
+
+    // ==================== الدوال الخاصة ====================
+
     private suspend fun askGeminiForSuggestion(prompt: String): String? {
         return try {
-            // ✅ الحصول على مفتاح Gemini من المستودع الآمن
             val apiKey = secureSettingsRepo.getGeminiKey()
             if (apiKey.isNullOrBlank()) {
                 Timber.e("Gemini API key not found")
                 return null
             }
-            // ✅ استخدام الدالة التي تستقبل المفتاح صراحة (نقوم بتعديل الاستدعاء هنا)
             val request = com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto(
                 contents = listOf(
                     com.aiautocreate.data.datasource.remote.dto.request.Content(
