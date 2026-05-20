@@ -280,7 +280,7 @@ fun FfmpegScreen(
 
             Spacer(Modifier.height(Spacing.md))
 
-            // مفاتيح AI Pipeline (مع أيقونات معلومات)
+            // مفاتيح AI Pipeline (مع وصف لكل عنصر)
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -300,80 +300,90 @@ fun FfmpegScreen(
                     )
                     Spacer(Modifier.height(Spacing.md))
 
-                    ToggleWithInfo(
+                    AppToggleCard(
                         title = "النموذج الرئيسي",
-                        description = "يقوم هذا النموذج بتحليل النص العام للمشروع وتوليد الهيكل الرئيسي للفيديو، مثل تقسيم السيناريو واقتراح المشاهد.",
-                        checked = state.isMasterModelEnabled,
+                        description = "يقوم بتحليل النص العام للمشروع وتوليد الهيكل الرئيسي للفيديو، مثل تقسيم السيناريو واقتراح المشاهد.",
+                        isChecked = state.isMasterModelEnabled,
                         onCheckedChange = { viewModel.onMasterModelToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "مؤثرات صوتية",
                         description = "يضيف مؤثرات صوتية تلقائية (مثل الضوضاء، الصدى، الموسيقى الخلفية) حسب المشهد.",
-                        checked = state.isAudioFxEnabled,
+                        isChecked = state.isAudioFxEnabled,
                         onCheckedChange = { viewModel.onAudioFxToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "مؤثرات بصرية",
                         description = "يطبق تأثيرات بصرية على الفيديو مثل التلاشي، التمويه، تغيير الألوان، لزيادة الجاذبية.",
-                        checked = state.isVisualFxEnabled,
+                        isChecked = state.isVisualFxEnabled,
                         onCheckedChange = { viewModel.onVisualFxToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "انتقالات",
                         description = "يضيف انتقالات سلسة بين المشاهد (مثل الانزلاق، التلاشي، التكبير) لتحسين تدفق الفيديو.",
-                        checked = state.isTransitionsEnabled,
+                        isChecked = state.isTransitionsEnabled,
                         onCheckedChange = { viewModel.onTransitionsToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "عدد ذكي",
                         description = "يقوم بتحليل الصور الناتجة ويختار أفضل الصور لتناسب المونتاج، ويتجاهل الصور المتشابهة أو الضعيفة.",
-                        checked = state.isSmartCountEnabled,
+                        isChecked = state.isSmartCountEnabled,
                         onCheckedChange = { viewModel.onSmartCountToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "ترجمة",
                         description = "يضيف ترجمة (subtitles) للفيديو بناءً على النص المقروء أو الصوت، مع إمكانية تخصيص الخط والحجم.",
-                        checked = state.isSubtitlesEnabled,
+                        isChecked = state.isSubtitlesEnabled,
                         onCheckedChange = { viewModel.onSubtitlesToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "موسيقى",
                         description = "يولّد أو يضيف موسيقى خلفية مناسبة لمزاج الفيديو، أو يمكنه اختيار مسارات موسيقية من مكتبة خارجية.",
-                        checked = state.isMusicEnabled,
+                        isChecked = state.isMusicEnabled,
                         onCheckedChange = { viewModel.onMusicToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "مراجع",
                         description = "يقوم بمراجعة النص أو الفيديو النهائي ويقدم اقتراحات للتحسين (مثل تغيير الترتيب، التوقيت، الأسلوب).",
-                        checked = state.isReviewerEnabled,
+                        isChecked = state.isReviewerEnabled,
                         onCheckedChange = { viewModel.onReviewerToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "منسق رئيسي",
                         description = "يقوم بتنسيق جميع المهام الفرعية (صور، صوت، فيديو) لضمان اتساق الجودة والوقت والإخراج النهائي.",
-                        checked = state.isMasterOrchestratorEnabled,
+                        isChecked = state.isMasterOrchestratorEnabled,
                         onCheckedChange = { viewModel.onMasterOrchToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "فيديوهات خارجية",
                         description = "يبحث في APIs خارجية (مثل Pexels, Pixabay) ويضيف فيديوهات إضافية (B-roll) تتناسب مع المشهد.",
-                        checked = state.isExternalVideoEnabled,
+                        isChecked = state.isExternalVideoEnabled,
                         onCheckedChange = { viewModel.onExternalVideoToggled(it) }
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    ToggleWithInfo(
+
+                    AppToggleCard(
                         title = "صور خارجية",
                         description = "يبحث في APIs خارجية ويضيف صوراً كخلفيات أو تراكبات (overlays) لتحسين العناصر البصرية.",
-                        checked = state.isExternalImageEnabled,
+                        isChecked = state.isExternalImageEnabled,
                         onCheckedChange = { viewModel.onExternalImageToggled(it) }
                     )
                 }
@@ -381,7 +391,6 @@ fun FfmpegScreen(
 
             Spacer(Modifier.height(Spacing.lg))
 
-            // زر الحفظ
             AppButton(
                 text = "حفظ التعديلات 💾",
                 onClick = { viewModel.saveSettings() },
@@ -485,71 +494,5 @@ private fun DurationPicker(
                 )
             }
         }
-    }
-}
-
-// دالة عرض حوار المعلومات
-@Composable
-private fun InfoDialog(description: String, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("الوصف", fontWeight = FontWeight.Bold) },
-        text = { Text(description, lineHeight = 20.sp) },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("حسناً") }
-        },
-        containerColor = CardPrimary,
-        titleContentColor = TextPrimary,
-        textContentColor = TextBody
-    )
-}
-
-// عنصر تبديل مع أيقونة معلومات
-@Composable
-private fun ToggleWithInfo(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    var showDialog by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.xs)
-            .clip(RoundedCornerShape(Radius.lg))
-            .background(CardSoft)
-            .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_info),
-            contentDescription = "معلومات",
-            modifier = Modifier
-                .size(IconSize.sm)
-                .clickable { showDialog = true },
-            tint = PrimaryLight
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            color = TextPrimary,
-            fontSize = AppFontSize.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = SwitchThumb,
-                checkedTrackColor = SwitchTrackActive,
-                uncheckedThumbColor = SwitchThumb,
-                uncheckedTrackColor = SwitchTrackInactive
-            )
-        )
-    }
-    if (showDialog) {
-        InfoDialog(description) { showDialog = false }
     }
 }
