@@ -12,7 +12,8 @@ data class ModelsSettingsState(
     val pixabayApiKey: String = "",
     val pexelsApiKey: String = "",
     val freesoundApiKey: String = "",
-    val geminiKeysCsv: String = "",   // ✅ جديد
+    val geminiKeysCsv: String = "",
+    val huggingFaceTokensCsv: String = "",   // ✅ جديد
     val selectedModels: Map<String, String> = emptyMap(),
     val availableModelsByCategory: Map<String, List<ModelInfo>> = emptyMap(),
     val ttsVoiceSamplePath: String = "",
