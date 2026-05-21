@@ -14,7 +14,7 @@ class ExecuteAgentTaskUseCase @Inject constructor(
     private val huggingFaceApi: HuggingFaceApi,
     private val interventionHandler: AgentInterventionHandler,
     private val agentOrchestrator: AgentOrchestrator,
-    private val tokenManager: HuggingFaceTokenManager   // ✅ حقن مدير التوكنات
+    private val tokenManager: HuggingFaceTokenManager
 ) {
 
     suspend fun execute(taskId: String, input: String, style: String = "", category: String = ""): AgentResult {
@@ -28,64 +28,49 @@ class ExecuteAgentTaskUseCase @Inject constructor(
         var lastError: String? = null
 
         while (currentDepth <= agentOrchestrator.getCurrentMaxDepth()) {
-            // تجربة جميع التوكنات المتاحة
-            val tokens = tokenManager.getAllTokens()
-            if (tokens.isEmpty()) {
-                return AgentResult(false, errorMessage = "لا توجد توكنات HuggingFace صالحة. يرجى إدخال توكن واحد على الأقل في الإعدادات.")
-            }
-
-            var success = false
-            var result: AgentResult? = null
-
-            for (i in tokens.indices) {
-                val token = tokenManager.getCurrentToken()
-                if (token.isNullOrBlank()) continue
-
-                val authHeader = "Bearer $token"
-                val taskResult = when (taskId) {
+            // استخدام التوكن المناسب لهذا النموذج
+            var currentToken = tokenManager.getTokenForModel(currentModelId)
+            var attempts = 0
+            val maxAttempts = tokenManager.getAllTokens().size.coerceAtLeast(1)
+            while (attempts < maxAttempts && currentToken != null) {
+                val authHeader = "Bearer $currentToken"
+                val result = when (taskId) {
                     "generate_image" -> generateImageWithModel(currentModelId, input, authHeader)
                     "generate_audio" -> generateAudioWithModel(currentModelId, input, authHeader)
                     else -> AgentResult(false, errorMessage = "المهمة $taskId غير مدعومة")
                 }
 
-                if (taskResult.success) {
-                    tokenManager.markSuccess()
-                    result = taskResult
-                    success = true
-                    break
+                if (result.success) {
+                    tokenManager.markSuccess(currentModelId, currentToken)
+                    return result
                 } else {
-                    val error = taskResult.errorMessage ?: ""
-                    if (error.contains("401") || error.contains("403") || error.contains("429")) {
-                        Timber.w("فشل التوكن الحالي، التبديل إلى التالي: $error")
-                        tokenManager.markFailureAndGetNext()
+                    val error = result.errorMessage ?: ""
+                    if (error.contains("429")) {
+                        tokenManager.markRateLimit(currentModelId, currentToken)
+                        currentToken = tokenManager.getNextTokenForModel(currentModelId, currentToken)
+                        attempts++
                         continue
                     } else {
                         // خطأ غير متعلق بالتوكن (مثلاً النموذج لا يعمل)
-                        result = taskResult
+                        lastError = error
                         break
                     }
                 }
             }
 
-            if (success && result != null) return result
-
-            lastError = result?.errorMessage ?: "فشل غير معروف"
+            // إذا انتهت التوكنات دون نجاح، نحاول نموذجاً بديلاً
             if (currentDepth >= agentOrchestrator.getCurrentMaxDepth()) break
-
             val alternative = agentOrchestrator.suggestAlternativeModel(
                 category = category,
                 failedModelId = currentModelId,
-                errorMessage = lastError,
+                errorMessage = lastError ?: "فشل غير معروف",
                 currentDepth = currentDepth
             )
-
             if (alternative == null) break
-
             interventionHandler.temporarilySwitchModel(category, alternative.modelId)
             currentModelId = alternative.modelId
             currentDepth++
         }
-
         return AgentResult(false, errorMessage = "فشل التنفيذ بعد $currentDepth محاولة: $lastError")
     }
 
