@@ -113,6 +113,25 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 
+// ✅ دوال قائمة توكنات HuggingFace (CSV)
+suspend fun setHuggingFaceTokensCsv(tokensCsv: String) = setString("hf_tokens_csv", tokensCsv)
+suspend fun getHuggingFaceTokensCsv(): String = getStringOnce("hf_tokens_csv", "")
+suspend fun addToHuggingFaceTokensCsv(newToken: String) {
+    val current = getHuggingFaceTokensCsv()
+    val items = csvToList(current).toMutableList()
+    if (!items.contains(newToken)) {
+        items.add(newToken)
+        setHuggingFaceTokensCsv(items.joinToString(","))
+    }
+}
+suspend fun removeFromHuggingFaceTokensCsv(tokenToRemove: String) {
+    val current = getHuggingFaceTokensCsv()
+    val items = csvToList(current).toMutableList()
+    if (items.remove(tokenToRemove)) {
+        setHuggingFaceTokensCsv(items.joinToString(","))
+    }
+}
+    
     // ✅ دوال المسارات الجديدة (باستخدام المجلد الخاص بالتطبيق)
     private fun getAppRoot(): String {
         val context = AIAutoCreateApp.instance
