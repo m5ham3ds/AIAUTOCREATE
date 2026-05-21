@@ -122,11 +122,90 @@ class AgentViewModel @Inject constructor(
 
     fun onTabSelected(tab: Int) {
         _state.update { it.copy(selectedTab = tab) }
-        if (tab == 3) loadStats() // تحديث الإحصائيات عند فتح التبويب
+        if (tab == 3) loadStats()
     }
 
     fun onInputChanged(text: String) {
         _state.update { it.copy(inputText = text, chatError = null) }
+    }
+
+    // ==================== دوال أزرار التحليلات ====================
+    fun performQuickScan() {
+        if (_state.value.isPerformingQuickScan) return
+        viewModelScope.launch {
+            _state.update { it.copy(isPerformingQuickScan = true, chatError = null) }
+            val loadingMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                text = "🔍 جاري إجراء فحص سريع...",
+                isUser = false
+            )
+            _state.update { it.copy(chatMessages = it.chatMessages + loadingMsg) }
+            val result = agentOrchestrator.quickScan()
+            val agentMessage = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                text = result,
+                isUser = false
+            )
+            _state.update {
+                it.copy(
+                    chatMessages = it.chatMessages + agentMessage,
+                    isPerformingQuickScan = false
+                )
+            }
+            loadStats()
+        }
+    }
+
+    fun performFullAnalysis() {
+        if (_state.value.isPerformingFullAnalysis) return
+        viewModelScope.launch {
+            _state.update { it.copy(isPerformingFullAnalysis = true, chatError = null) }
+            val loadingMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                text = "📊 جاري إجراء تحليل شامل... قد يستغرق دقيقة.",
+                isUser = false
+            )
+            _state.update { it.copy(chatMessages = it.chatMessages + loadingMsg) }
+            val result = agentOrchestrator.fullAnalysis()
+            val agentMessage = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                text = result,
+                isUser = false
+            )
+            _state.update {
+                it.copy(
+                    chatMessages = it.chatMessages + agentMessage,
+                    isPerformingFullAnalysis = false
+                )
+            }
+            loadStats()
+        }
+    }
+
+    fun performCriticalErrorsCheck() {
+        if (_state.value.isCheckingErrors) return
+        viewModelScope.launch {
+            _state.update { it.copy(isCheckingErrors = true, chatError = null) }
+            val loadingMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                text = "⚠️ جاري فحص الأخطاء الخطيرة...",
+                isUser = false
+            )
+            _state.update { it.copy(chatMessages = it.chatMessages + loadingMsg) }
+            val result = agentOrchestrator.criticalErrorsCheck()
+            val agentMessage = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                text = result,
+                isUser = false
+            )
+            _state.update {
+                it.copy(
+                    chatMessages = it.chatMessages + agentMessage,
+                    isCheckingErrors = false
+                )
+            }
+            loadStats()
+        }
     }
 
     fun sendMessage() {
@@ -149,16 +228,24 @@ class AgentViewModel @Inject constructor(
             isUser = true
         )
 
-        _state.update { it.copy(
-            chatMessages = it.chatMessages + userMessage,
-            inputText = "",
-            isChatLoading = true,
-            chatError = null
-        ) }
+        _state.update {
+            it.copy(
+                chatMessages = it.chatMessages + userMessage,
+                inputText = "",
+                isChatLoading = true,
+                chatError = null
+            )
+        }
 
         viewModelScope.launch {
             try {
-                val replyText = agentOrchestrator.getContextualAnswer(text)
+                // التحقق من إذا كانت رسالة ترحيبية بسيطة
+                val isGreeting = Regex("مرحب|اهلا|سلام|hello|hi|شكر", RegexOption.IGNORE_CASE).containsMatchIn(text)
+                val replyText = if (isGreeting) {
+                    "مرحباً! كيف يمكنني مساعدتك اليوم؟ يمكنك استخدام الأزرار أعلاه للحصول على تحليل سريع أو شامل."
+                } else {
+                    agentOrchestrator.getContextualAnswer(text)
+                }
                 val agentMessage = ChatMessage(
                     id = UUID.randomUUID().toString(),
                     text = replyText,
