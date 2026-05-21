@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.aiautocreate.agent.GeminiKeyManager
+import com.aiautocreate.agent.HuggingFaceTokenManager
 import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.repository.IModelsRepository
 import com.aiautocreate.domain.repository.ISettingsRepository
@@ -22,7 +24,9 @@ class ModelsSettingsViewModel @Inject constructor(
     private val secureSettingsRepo: ISettingsRepository,
     private val modelsRepo: IModelsRepository,
     private val refreshStylesUseCase: RefreshModelsStylesUseCase,
-    private val application: Application
+    private val application: Application,
+    private val geminiKeyManager: GeminiKeyManager,      // ✅ حقن مدير مفاتيح Gemini
+    private val hfTokenManager: HuggingFaceTokenManager  // ✅ حقن مدير توكنات HuggingFace
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsSettingsState())
@@ -62,7 +66,7 @@ class ModelsSettingsViewModel @Inject constructor(
             val ttsUrl = appSettingsRepo.getStringOnce("tts_url", "")
             val ffmpegPath = appSettingsRepo.getStringOnce("ffmpeg_path", "")
             val geminiKeysCsv = appSettingsRepo.getGeminiKeysCsv()
-            val huggingFaceTokensCsv = appSettingsRepo.getHuggingFaceTokensCsv()   // ✅ جديد
+            val huggingFaceTokensCsv = appSettingsRepo.getHuggingFaceTokensCsv()
 
             val selected = categories.mapNotNull { (category, _) ->
                 val modelId = appSettingsRepo.getStringOnce("selected_model_$category", "")
@@ -91,7 +95,7 @@ class ModelsSettingsViewModel @Inject constructor(
                     pexelsApiKey = pexelsKey,
                     freesoundApiKey = freesoundKey,
                     geminiKeysCsv = geminiKeysCsv,
-                    huggingFaceTokensCsv = huggingFaceTokensCsv,   // ✅ جديد
+                    huggingFaceTokensCsv = huggingFaceTokensCsv,
                     selectedModels = selected,
                     ttsVoiceSamplePath = ttsSamplePath,
                     ttsUseVoiceClone = ttsUseClone
@@ -129,7 +133,7 @@ class ModelsSettingsViewModel @Inject constructor(
     fun onPexelsKeyChanged(v: String) = _state.update { it.copy(pexelsApiKey = v) }
     fun onFreesoundKeyChanged(v: String) = _state.update { it.copy(freesoundApiKey = v) }
     fun onGeminiKeysChanged(csv: String) = _state.update { it.copy(geminiKeysCsv = csv) }
-    fun onHuggingFaceTokensChanged(csv: String) = _state.update { it.copy(huggingFaceTokensCsv = csv) }   // ✅ جديد
+    fun onHuggingFaceTokensChanged(csv: String) = _state.update { it.copy(huggingFaceTokensCsv = csv) }
 
     fun onVoiceSamplePathChanged(path: String) {
         _state.update { it.copy(ttsVoiceSamplePath = path) }
@@ -177,7 +181,11 @@ class ModelsSettingsViewModel @Inject constructor(
                 appSettingsRepo.setString("tts_url", s.ttsUrl)
                 appSettingsRepo.setString("ffmpeg_path", s.ffmpegPath)
                 appSettingsRepo.setGeminiKeysCsv(s.geminiKeysCsv)
-                appSettingsRepo.setHuggingFaceTokensCsv(s.huggingFaceTokensCsv)   // ✅ جديد
+                appSettingsRepo.setHuggingFaceTokensCsv(s.huggingFaceTokensCsv)
+
+                // تحديث قوائم المفاتيح في المديرين
+                geminiKeyManager.refreshKeys()
+                hfTokenManager.refreshTokens()
 
                 s.selectedModels.forEach { (category, modelId) ->
                     appSettingsRepo.setString("selected_model_$category", modelId)
