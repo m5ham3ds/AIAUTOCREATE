@@ -61,7 +61,8 @@ class ModelsSettingsViewModel @Inject constructor(
             val geminiUrl = appSettingsRepo.getStringOnce("gemini_url", "")
             val ttsUrl = appSettingsRepo.getStringOnce("tts_url", "")
             val ffmpegPath = appSettingsRepo.getStringOnce("ffmpeg_path", "")
-            val geminiKeysCsv = appSettingsRepo.getGeminiKeysCsv()   // ✅ جديد
+            val geminiKeysCsv = appSettingsRepo.getGeminiKeysCsv()
+            val huggingFaceTokensCsv = appSettingsRepo.getHuggingFaceTokensCsv()   // ✅ جديد
 
             val selected = categories.mapNotNull { (category, _) ->
                 val modelId = appSettingsRepo.getStringOnce("selected_model_$category", "")
@@ -90,6 +91,7 @@ class ModelsSettingsViewModel @Inject constructor(
                     pexelsApiKey = pexelsKey,
                     freesoundApiKey = freesoundKey,
                     geminiKeysCsv = geminiKeysCsv,
+                    huggingFaceTokensCsv = huggingFaceTokensCsv,   // ✅ جديد
                     selectedModels = selected,
                     ttsVoiceSamplePath = ttsSamplePath,
                     ttsUseVoiceClone = ttsUseClone
@@ -126,7 +128,8 @@ class ModelsSettingsViewModel @Inject constructor(
     fun onPixabayKeyChanged(v: String) = _state.update { it.copy(pixabayApiKey = v) }
     fun onPexelsKeyChanged(v: String) = _state.update { it.copy(pexelsApiKey = v) }
     fun onFreesoundKeyChanged(v: String) = _state.update { it.copy(freesoundApiKey = v) }
-    fun onGeminiKeysChanged(csv: String) = _state.update { it.copy(geminiKeysCsv = csv) }   // ✅ جديد
+    fun onGeminiKeysChanged(csv: String) = _state.update { it.copy(geminiKeysCsv = csv) }
+    fun onHuggingFaceTokensChanged(csv: String) = _state.update { it.copy(huggingFaceTokensCsv = csv) }   // ✅ جديد
 
     fun onVoiceSamplePathChanged(path: String) {
         _state.update { it.copy(ttsVoiceSamplePath = path) }
@@ -173,7 +176,8 @@ class ModelsSettingsViewModel @Inject constructor(
                 appSettingsRepo.setString("gemini_url", s.geminiUrl)
                 appSettingsRepo.setString("tts_url", s.ttsUrl)
                 appSettingsRepo.setString("ffmpeg_path", s.ffmpegPath)
-                appSettingsRepo.setGeminiKeysCsv(s.geminiKeysCsv)   // ✅ جديد
+                appSettingsRepo.setGeminiKeysCsv(s.geminiKeysCsv)
+                appSettingsRepo.setHuggingFaceTokensCsv(s.huggingFaceTokensCsv)   // ✅ جديد
 
                 s.selectedModels.forEach { (category, modelId) ->
                     appSettingsRepo.setString("selected_model_$category", modelId)
