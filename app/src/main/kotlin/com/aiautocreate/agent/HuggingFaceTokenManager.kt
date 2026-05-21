@@ -12,9 +12,11 @@ class HuggingFaceTokenManager @Inject constructor(
     private val appSettingsRepo: AppSettingsRepository
 ) {
     private val mutex = Mutex()
-    private var currentTokenIndex = 0
-    private var lastSuccessfulToken: String? = null
     private var cachedTokens: List<String> = emptyList()
+    // لكل نموذج -> آخر توكن نجح معه
+    private val lastSuccessfulTokenForModel = mutableMapOf<String, String>()
+    // لكل نموذج -> قائمة التوكنات التي فشلت معه مؤقتاً
+    private val failedTokensForModel = mutableMapOf<String, MutableSet<String>>()
 
     suspend fun refreshTokens() {
         mutex.withLock {
@@ -25,37 +27,73 @@ class HuggingFaceTokenManager @Inject constructor(
                 val singleToken = appSettingsRepo.getStringOnce("hf_token", "")
                 if (singleToken.isNotBlank()) listOf(singleToken) else emptyList()
             }
-            if (lastSuccessfulToken != null && cachedTokens.contains(lastSuccessfulToken)) {
-                currentTokenIndex = cachedTokens.indexOf(lastSuccessfulToken)
-            } else {
-                currentTokenIndex = 0
-                lastSuccessfulToken = cachedTokens.getOrNull(0)
-            }
             Timber.d("تم تحديث قائمة توكنات HuggingFace، العدد: ${cachedTokens.size}")
         }
     }
 
-    suspend fun getCurrentToken(): String? {
+    /**
+     * الحصول على التوكن المناسب لنموذج معين.
+     * يفضل آخر توكن نجح مع هذا النموذج، ثم أول توكن لم يفشل معه.
+     */
+    suspend fun getTokenForModel(modelId: String): String? {
         mutex.withLock {
             if (cachedTokens.isEmpty()) refreshTokens()
-            return cachedTokens.getOrNull(currentTokenIndex)
-        }
-    }
-
-    suspend fun markFailureAndGetNext(): String? {
-        mutex.withLock {
             if (cachedTokens.isEmpty()) return null
-            currentTokenIndex = (currentTokenIndex + 1) % cachedTokens.size
-            val nextToken = cachedTokens.getOrNull(currentTokenIndex)
-            Timber.w("التوكن الحالي فشل، التبديل إلى التالي (الفهرس $currentTokenIndex)")
-            return nextToken
+
+            // 1. نفضل آخر توكن نجح مع هذا النموذج
+            val lastSuccess = lastSuccessfulTokenForModel[modelId]
+            if (lastSuccess != null && cachedTokens.contains(lastSuccess)) {
+                return lastSuccess
+            }
+
+            // 2. نبحث عن أول توكن لم يفشل مع هذا النموذج
+            val failed = failedTokensForModel[modelId] ?: emptySet()
+            val candidate = cachedTokens.firstOrNull { !failed.contains(it) }
+            if (candidate != null) return candidate
+
+            // 3. جميع التوكنات فشلت، نعيد أقدمها (سيؤدي إلى محاولة جديدة)
+            return cachedTokens.firstOrNull()
         }
     }
 
-    suspend fun markSuccess() {
+    /**
+     * تسجيل نجاح توكن مع نموذج معين.
+     */
+    suspend fun markSuccess(modelId: String, token: String) {
         mutex.withLock {
-            lastSuccessfulToken = cachedTokens.getOrNull(currentTokenIndex)
-            Timber.d("تم تسجيل نجاح التوكن الحالي")
+            lastSuccessfulTokenForModel[modelId] = token
+            failedTokensForModel[modelId]?.remove(token)
+            Timber.d("✅ نجاح التوكن $token مع النموذج $modelId")
+        }
+    }
+
+    /**
+     * تسجيل فشل توكن مع نموذج معين بسبب تجاوز الحد (429).
+     */
+    suspend fun markRateLimit(modelId: String, token: String) {
+        mutex.withLock {
+            val failedSet = failedTokensForModel.getOrPut(modelId) { mutableSetOf() }
+            failedSet.add(token)
+            Timber.w("⚠️ التوكن $token تجاوز الحد مع النموذج $modelId (429)")
+        }
+    }
+
+    /**
+     * الحصول على التوكن التالي لنفس النموذج بعد فشل التوكن الحالي.
+     */
+    suspend fun getNextTokenForModel(modelId: String, currentFailedToken: String): String? {
+        mutex.withLock {
+            // سجل الفشل أولاً
+            val failedSet = failedTokensForModel.getOrPut(modelId) { mutableSetOf() }
+            failedSet.add(currentFailedToken)
+
+            // ابحث عن توكن آخر لم يفشل بعد
+            val available = cachedTokens.filter { !failedSet.contains(it) }
+            val next = available.firstOrNull()
+            if (next != null) return next
+
+            // إذا لم يبقَ أي توكن، نعيد أول توكن (سيحاول من جديد)
+            return cachedTokens.firstOrNull()
         }
     }
 
