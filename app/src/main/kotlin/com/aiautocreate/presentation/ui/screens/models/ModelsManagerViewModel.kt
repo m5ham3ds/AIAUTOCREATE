@@ -138,8 +138,10 @@ class ModelsManagerViewModel @Inject constructor(
                     }
                 } catch (e: HttpException) {
                     if (e.code() == 429) {
-                        tokenManager.markRateLimit(modelId, currentToken)
-                        currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                        if (currentToken != null) {
+                            tokenManager.markRateLimit(modelId, currentToken)
+                            currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                        }
                         attempts++
                     } else {
                         _state.update { it.copy(isSearching = false, searchError = "خطأ في الخادم (${e.code()})") }
@@ -237,7 +239,6 @@ class ModelsManagerViewModel @Inject constructor(
     fun searchModelsByCategory() {
         viewModelScope.launch {
             _state.update { it.copy(isSearchingByCategory = true, categorySearchResults = emptyList()) }
-            // البحث العام نستخدم أول توكن صالح
             val generalToken = tokenManager.getAllTokens().firstOrNull()
             if (generalToken == null) {
                 _state.update { it.copy(isSearchingByCategory = false, categorySearchResults = emptyList()) }
