@@ -20,6 +20,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aiautocreate.R
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.presentation.common.components.*
@@ -54,6 +57,18 @@ fun ModelsManagerScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf("active") }
     val scope = rememberCoroutineScope()
+
+    // ✅ إعادة تحميل النماذج عند العودة إلى الشاشة (بعد حفظ الإعدادات)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadModels()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(
         modifier = modifier
