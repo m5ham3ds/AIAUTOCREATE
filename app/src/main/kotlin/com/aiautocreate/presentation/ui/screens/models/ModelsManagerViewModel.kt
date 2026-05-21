@@ -2,6 +2,7 @@ package com.aiautocreate.presentation.ui.screens.models
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aiautocreate.agent.HuggingFaceTokenManager
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.response.HfModelInfo
 import com.aiautocreate.domain.model.ModelConfig
@@ -12,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -19,7 +21,8 @@ class ModelsManagerViewModel @Inject constructor(
     private val manageModelsUseCase: ManageModelsUseCase,
     private val checkApiModelsUseCase: CheckApiModelsUseCase,
     private val huggingFaceApi: HuggingFaceApi,
-    private val secureSettingsRepo: ISettingsRepository
+    private val secureSettingsRepo: ISettingsRepository,
+    private val tokenManager: HuggingFaceTokenManager   // ✅ مدير التوكنات
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -27,9 +30,9 @@ class ModelsManagerViewModel @Inject constructor(
 
     init {
         loadModels()
+        viewModelScope.launch { tokenManager.refreshTokens() }
     }
 
-    // ✅ جعل الدالة عامة لإعادة التحميل من الشاشة
     fun loadModels() {
         viewModelScope.launch {
             val apiStatusFlow = secureSettingsRepo.observeHasApiKeys()
@@ -71,8 +74,8 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    private suspend fun getHuggingFaceToken(): String {
-        return secureSettingsRepo.getHuggingFaceToken() ?: ""
+    private suspend fun getHuggingFaceToken(): String? {
+        return tokenManager.getCurrentToken()
     }
 
     fun onSearchQueryChanged(query: String) {
@@ -87,45 +90,75 @@ class ModelsManagerViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _state.update { it.copy(isSearching = true, searchError = null, searchedModel = null) }
-            try {
+            var attempts = 0
+            val maxAttempts = tokenManager.getAllTokens().size.coerceAtLeast(1)
+            while (attempts < maxAttempts) {
                 val token = getHuggingFaceToken()
-                val authHeader = if (token.isNotBlank()) "Bearer $token" else ""
-                val response = huggingFaceApi.getModelInfo(query, authHeader)
-                if (response.isSuccessful && response.body() != null) {
-                    val modelInfo = response.body()!!
-                    val editable = EditableModel(
-                        original = modelInfo,
-                        customName = modelInfo.cardData?.title?.takeIf { it.isNotBlank() }
-                            ?: modelInfo.id.split("/").last(),
-                        customDescription = modelInfo.cardData?.description ?: "لا يوجد وصف متاح",
-                        isEnabled = true,
-                        category = guessCategoryFromPipelineTag(modelInfo.pipelineTag),
-                        settingsUrl = "",
-                        readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
-                        supportedStyles = "",
-                        supportsVoiceCloning = false
-                    )
+                if (token.isNullOrBlank()) {
                     _state.update {
-                        it.copy(
-                            isSearching = false,
-                            searchedModel = modelInfo,
-                            editableModel = editable,
-                            searchError = null
-                        )
+                        it.copy(isSearching = false, searchError = "لا توجد توكنات HuggingFace صالحة. يرجى إدخال توكن واحد على الأقل في الإعدادات.")
                     }
-                } else {
-                    val errorMsg = when (response.code()) {
-                        401 -> "خطأ في المصادقة: تأكد من إدخال HuggingFace Token في الإعدادات"
-                        404 -> "النموذج غير موجود في HuggingFace"
-                        else -> "فشل البحث: ${response.code()}"
-                    }
-                    _state.update { it.copy(isSearching = false, searchError = errorMsg) }
+                    return@launch
                 }
-            } catch (e: HttpException) {
-                _state.update { it.copy(isSearching = false, searchError = "خطأ في الخادم (${e.code()})") }
-            } catch (e: Exception) {
-                _state.update { it.copy(isSearching = false, searchError = "فشل الاتصال: ${e.message}") }
+                try {
+                    val authHeader = "Bearer $token"
+                    val response = huggingFaceApi.getModelInfo(query, authHeader)
+                    if (response.isSuccessful && response.body() != null) {
+                        tokenManager.markSuccess()
+                        val modelInfo = response.body()!!
+                        val editable = EditableModel(
+                            original = modelInfo,
+                            customName = modelInfo.cardData?.title?.takeIf { it.isNotBlank() }
+                                ?: modelInfo.id.split("/").last(),
+                            customDescription = modelInfo.cardData?.description ?: "لا يوجد وصف متاح",
+                            isEnabled = true,
+                            category = guessCategoryFromPipelineTag(modelInfo.pipelineTag),
+                            settingsUrl = "",
+                            readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
+                            supportedStyles = "",
+                            supportsVoiceCloning = false
+                        )
+                        _state.update {
+                            it.copy(
+                                isSearching = false,
+                                searchedModel = modelInfo,
+                                editableModel = editable,
+                                searchError = null
+                            )
+                        }
+                        return@launch
+                    } else {
+                        val code = response.code()
+                        if (code == 401 || code == 403 || code == 404 || code == 429) {
+                            Timber.w("فشل التوكن الحالي ($code)، التبديل إلى التالي")
+                            tokenManager.markFailureAndGetNext()
+                            attempts++
+                            continue
+                        }
+                        val errorMsg = when (code) {
+                            401 -> "خطأ في المصادقة: التوكن غير صالح"
+                            403 -> "غير مصرح: التوكن لا يملك صلاحية لهذا النموذج"
+                            404 -> "النموذج غير موجود في HuggingFace"
+                            429 -> "تجاوز حد الطلبات لهذا التوكن"
+                            else -> "فشل البحث: $code"
+                        }
+                        _state.update { it.copy(isSearching = false, searchError = errorMsg) }
+                        return@launch
+                    }
+                } catch (e: HttpException) {
+                    if (e.code() == 401 || e.code() == 403 || e.code() == 429) {
+                        tokenManager.markFailureAndGetNext()
+                        attempts++
+                        continue
+                    }
+                    _state.update { it.copy(isSearching = false, searchError = "خطأ في الخادم (${e.code()})") }
+                    return@launch
+                } catch (e: Exception) {
+                    _state.update { it.copy(isSearching = false, searchError = "فشل الاتصال: ${e.message}") }
+                    return@launch
+                }
             }
+            _state.update { it.copy(isSearching = false, searchError = "جميع التوكنات فشلت أو تجاوزت الحد المسموح. يرجى إضافة توكنات جديدة أو المحاولة لاحقاً.") }
         }
     }
 
@@ -212,22 +245,41 @@ class ModelsManagerViewModel @Inject constructor(
     fun searchModelsByCategory() {
         viewModelScope.launch {
             _state.update { it.copy(isSearchingByCategory = true, categorySearchResults = emptyList()) }
-            try {
+            var attempts = 0
+            val maxAttempts = tokenManager.getAllTokens().size.coerceAtLeast(1)
+            while (attempts < maxAttempts) {
                 val token = getHuggingFaceToken()
-                val authHeader = if (token.isNotBlank()) "Bearer $token" else ""
-                val response = huggingFaceApi.searchModelsByCategory(
-                    pipelineTag = _state.value.selectedCategoryForSearch,
-                    limit = 30,
-                    authorization = authHeader
-                )
-                if (response.isSuccessful && response.body() != null) {
-                    _state.update { it.copy(categorySearchResults = response.body()!!, isSearchingByCategory = false) }
-                } else {
-                    _state.update { it.copy(categorySearchResults = emptyList(), isSearchingByCategory = false) }
+                if (token.isNullOrBlank()) {
+                    _state.update { it.copy(isSearchingByCategory = false, categorySearchResults = emptyList()) }
+                    return@launch
                 }
-            } catch (e: Exception) {
-                _state.update { it.copy(categorySearchResults = emptyList(), isSearchingByCategory = false) }
+                try {
+                    val authHeader = "Bearer $token"
+                    val response = huggingFaceApi.searchModelsByCategory(
+                        pipelineTag = _state.value.selectedCategoryForSearch,
+                        limit = 30,
+                        authorization = authHeader
+                    )
+                    if (response.isSuccessful && response.body() != null) {
+                        tokenManager.markSuccess()
+                        _state.update { it.copy(categorySearchResults = response.body()!!, isSearchingByCategory = false) }
+                        return@launch
+                    } else {
+                        val code = response.code()
+                        if (code == 401 || code == 403 || code == 429) {
+                            tokenManager.markFailureAndGetNext()
+                            attempts++
+                            continue
+                        }
+                        _state.update { it.copy(categorySearchResults = emptyList(), isSearchingByCategory = false) }
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    tokenManager.markFailureAndGetNext()
+                    attempts++
+                }
             }
+            _state.update { it.copy(categorySearchResults = emptyList(), isSearchingByCategory = false) }
         }
     }
 
