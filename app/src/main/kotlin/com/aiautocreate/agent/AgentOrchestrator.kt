@@ -24,7 +24,7 @@ class AgentOrchestrator @Inject constructor(
     private val appSettingsRepo: AppSettingsRepository,
     private val secureSettingsRepo: ISettingsRepository,
     private val contextProvider: ProjectContextProvider,
-    private val geminiKeyManager: GeminiKeyManager   // ✅ إضافة مدير المفاتيح
+    private val geminiKeyManager: GeminiKeyManager
 ) {
     private val _events = MutableSharedFlow<AgentEvent>()
     val events = _events.asSharedFlow()
@@ -34,7 +34,7 @@ class AgentOrchestrator @Inject constructor(
     init {
         CoroutineScope(Dispatchers.IO).launch {
             maxInterventionDepth = appSettingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
-            geminiKeyManager.refreshKeys()   // تحميل المفاتيح عند البدء
+            geminiKeyManager.refreshKeys()
         }
     }
 
@@ -120,8 +120,9 @@ class AgentOrchestrator @Inject constructor(
         emitEvent(AgentEvent.InterventionLogged(intervention))
     }
 
-    suspend fun getContextualAnswer(question: String): String {
-        val context = contextProvider.getFullContext()
+    // ==================== دوال الرد العادي والسياق ====================
+    suspend fun getContextualAnswer(question: String, customContext: String? = null): String {
+        val context = customContext ?: contextProvider.getQuickContext()  // استخدام السياق السريع للردود العادية
         var attempts = 0
         val maxAttempts = geminiKeyManager.getAllKeys().size.coerceAtLeast(1)
         while (attempts < maxAttempts) {
@@ -130,15 +131,11 @@ class AgentOrchestrator @Inject constructor(
                 return "عذراً، لا توجد مفاتيح Gemini متاحة. يرجى إدخال مفتاح واحد على الأقل في الإعدادات."
             }
             val fullPrompt = """
-                أنت مساعد ذكي لتطبيق AI AutoCreate لتحرير الفيديو وإنشاء المحتوى.
-                إليك السياق الحالي للتطبيق:
-                
+                أنت مساعد ذكي لتطبيق AI AutoCreate لتحرير الفيديو.
+                إليك ملخص سريع عن التطبيق:
                 $context
-                
                 سؤال المستخدم: $question
-                
-                أجب بإيجاز وبشكل مفيد بناءً على السياق أعلاه. إذا كان السؤال عن خطأ معين، حاول تحليله واقتراح حل.
-                إذا كان السؤال عن إجراءات أو توصيات، قدم نصائح عملية.
+                أجب بإيجاز وبشكل مفيد. إذا كان السؤال عن خطأ معين، حلله واقترح حلاً.
             """.trimIndent()
 
             val request = com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto(
@@ -151,7 +148,7 @@ class AgentOrchestrator @Inject constructor(
                 )
             )
             try {
-                val response = withTimeoutOrNull(10000L) { geminiApi.generateContent(apiKey, request) }
+                val response = withTimeoutOrNull(15000L) { geminiApi.generateContent(apiKey, request) }
                 if (response?.isSuccessful == true) {
                     geminiKeyManager.markSuccess()
                     return response.body()?.candidates?.firstOrNull()?.content?.parts?.joinToString(" ") { it.text ?: "" }
@@ -159,36 +156,106 @@ class AgentOrchestrator @Inject constructor(
                 } else {
                     val code = response?.code()
                     if (code == 429) {
-                        Timber.w("المفتاح الحالي تجاوز الحد (429)، التبديل إلى التالي")
                         geminiKeyManager.markFailureAndGetNext()
                         attempts++
                         continue
                     } else {
-                        return "حدث خطأ في الاتصال: ${response?.code() ?: "timeout"}"
+                        return "حدث خطأ في الاتصال: ${code ?: "timeout"}"
                     }
                 }
             } catch (e: Exception) {
-                Timber.e(e, "استثناء أثناء getContextualAnswer")
                 geminiKeyManager.markFailureAndGetNext()
                 attempts++
             }
         }
-        return "جميع مفاتيح Gemini تجاوزت الحد المسموح أو غير صالحة. يرجى المحاولة لاحقاً أو إضافة مفاتيح جديدة."
+        return "جميع مفاتيح Gemini تجاوزت الحد المسموح أو غير صالحة."
     }
 
-    suspend fun refreshStats(): AgentStats {
-        return contextProvider.getStats()
+    // ==================== دوال التحليلات المتخصصة ====================
+    suspend fun quickScan(): String {
+        val context = contextProvider.getQuickContext()
+        val apiKey = geminiKeyManager.getCurrentKey() ?: return "مفتاح Gemini غير موجود."
+        val prompt = """
+            أنت مساعد ذكي. قم بتحليل سريع لحالة التطبيق التالية:
+            $context
+            قدم ملخصاً مختصراً (سطرين كحد أقصى) عن الوضع الحالي للمشروع والنماذج والأخطاء إن وجدت.
+        """.trimIndent()
+        return executeGeminiPrompt(prompt, 20000L) ?: "فشل التحليل السريع."
     }
+
+    suspend fun fullAnalysis(): String {
+        val context = contextProvider.getFullContext()
+        val apiKey = geminiKeyManager.getCurrentKey() ?: return "مفتاح Gemini غير موجود."
+        val prompt = """
+            أنت خبير في تحليل تطبيقات AI. قم بتحليل شامل للتطبيق بناءً على السياق التالي:
+            $context
+            أجب في النقاط التالية:
+            1. حالة المشاريع والمشاكل المتوقعة.
+            2. كفاءة النماذج المختارة واقتراح تحسينات.
+            3. الأخطاء الأخيرة وتحليل أسبابها مع حلول مقترحة.
+            4. توصيات عامة لتحسين الأداء.
+        """.trimIndent()
+        return executeGeminiPrompt(prompt, 45000L) ?: "فشل التحليل الشامل."
+    }
+
+    suspend fun criticalErrorsCheck(): String {
+        val context = contextProvider.getErrorContext()
+        val apiKey = geminiKeyManager.getCurrentKey() ?: return "مفتاح Gemini غير موجود."
+        val prompt = """
+            أنت خبير أمن ومراقبة جودة. قم بفحص الأخطاء التالية:
+            $context
+            حدد الأخطاء الخطيرة فقط (التي تؤثر على عمل التطبيق)، واقترح حلاً عاجلاً لكل منها.
+            إذا لم تكن هناك أخطاء خطيرة، اذكر ذلك.
+        """.trimIndent()
+        return executeGeminiPrompt(prompt, 25000L) ?: "فشل فحص الأخطاء الخطيرة."
+    }
+
+    private suspend fun executeGeminiPrompt(prompt: String, timeoutMs: Long): String? {
+        var attempts = 0
+        val maxAttempts = geminiKeyManager.getAllKeys().size.coerceAtLeast(1)
+        while (attempts < maxAttempts) {
+            val apiKey = geminiKeyManager.getCurrentKey()
+            if (apiKey.isNullOrBlank()) return null
+            val request = com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto(
+                contents = listOf(
+                    com.aiautocreate.data.datasource.remote.dto.request.Content(
+                        parts = listOf(
+                            com.aiautocreate.data.datasource.remote.dto.request.Part(text = prompt)
+                        )
+                    )
+                )
+            )
+            try {
+                val response = withTimeoutOrNull(timeoutMs) { geminiApi.generateContent(apiKey, request) }
+                if (response?.isSuccessful == true) {
+                    geminiKeyManager.markSuccess()
+                    return response.body()?.candidates?.firstOrNull()?.content?.parts?.joinToString(" ") { it.text ?: "" }
+                } else {
+                    val code = response?.code()
+                    if (code == 429) {
+                        geminiKeyManager.markFailureAndGetNext()
+                        attempts++
+                        continue
+                    } else {
+                        return null
+                    }
+                }
+            } catch (e: Exception) {
+                geminiKeyManager.markFailureAndGetNext()
+                attempts++
+            }
+        }
+        return null
+    }
+
+    suspend fun refreshStats(): AgentStats = contextProvider.getStats()
 
     private suspend fun askGeminiForSuggestion(prompt: String): String? {
         var attempts = 0
         val maxAttempts = geminiKeyManager.getAllKeys().size.coerceAtLeast(1)
         while (attempts < maxAttempts) {
             val apiKey = geminiKeyManager.getCurrentKey()
-            if (apiKey.isNullOrBlank()) {
-                Timber.e("لا يوجد مفتاح Gemini صالح")
-                return null
-            }
+            if (apiKey.isNullOrBlank()) return null
             try {
                 val request = com.aiautocreate.data.datasource.remote.dto.request.GeminiRequestDto(
                     contents = listOf(
@@ -207,17 +274,12 @@ class AgentOrchestrator @Inject constructor(
                 } else {
                     val code = response?.code()
                     if (code == 429) {
-                        Timber.w("المفتاح الحالي تجاوز الحد (429)، التبديل إلى التالي")
                         geminiKeyManager.markFailureAndGetNext()
                         attempts++
                         continue
-                    } else {
-                        Timber.e("خطأ Gemini: $code")
-                        return null
-                    }
+                    } else return null
                 }
             } catch (e: Exception) {
-                Timber.e(e, "استثناء أثناء طلب Gemini")
                 geminiKeyManager.markFailureAndGetNext()
                 attempts++
             }
