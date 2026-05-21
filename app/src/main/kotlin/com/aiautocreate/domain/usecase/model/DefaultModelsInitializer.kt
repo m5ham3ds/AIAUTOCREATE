@@ -14,7 +14,13 @@ class DefaultModelsInitializer @Inject constructor(
 
     fun initializeIfNeeded() {
         runBlocking {
-            // 1. إضافة نموذج Gemini (فئة النصوص)
+            // ✅ حذف النموذج القديم لـ Gemini إذا كان موجوداً (لضمان تحديث provider)
+            val existingModels = modelsRepository.getAllModelConfigs().first()
+            existingModels.find { it.modelId == "gemini-2.0-flash" }?.let { oldModel ->
+                modelsRepository.deleteModelConfig(oldModel)
+            }
+
+            // 1. إضافة نموذج Gemini الجديد (فئة النصوص)
             val geminiModel = ModelConfig(
                 id = 0,
                 modelId = "gemini-2.0-flash",
@@ -39,7 +45,6 @@ class DefaultModelsInitializer @Inject constructor(
             modelsRepository.insertModelConfig(geminiModel)
 
             // 2. إضافة نموذج Flan T5 Base (فئة التحليل) - إذا لم يكن موجوداً
-            val existingModels = modelsRepository.getAllModelConfigs().first()
             val flanExists = existingModels.any { it.modelId == "google/flan-t5-base" }
             if (!flanExists) {
                 val flanModel = ModelConfig(
