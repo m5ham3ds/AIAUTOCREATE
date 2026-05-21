@@ -29,9 +29,9 @@ class ModelsManagerViewModel @Inject constructor(
         loadModels()
     }
 
-    private fun loadModels() {
+    // ✅ جعل الدالة عامة لإعادة التحميل من الشاشة
+    fun loadModels() {
         viewModelScope.launch {
-            // ✅ تحويل تغييرات حالة المفاتيح إلى خريطة الحالات لكل مزود
             val apiStatusFlow = secureSettingsRepo.observeHasApiKeys()
                 .map { checkApiModelsUseCase.checkAll() }
                 .catch { emit(emptyMap()) }
