@@ -18,8 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ModelsSettingsViewModel @Inject constructor(
-    private val appSettingsRepo: AppSettingsRepository,           // للإعدادات العامة (الروابط، المسارات، الاختيارات)
-    private val secureSettingsRepo: ISettingsRepository,          // ✅ للمفاتيح الآمنة
+    private val appSettingsRepo: AppSettingsRepository,
+    private val secureSettingsRepo: ISettingsRepository,
     private val modelsRepo: IModelsRepository,
     private val refreshStylesUseCase: RefreshModelsStylesUseCase,
     private val application: Application
@@ -29,18 +29,18 @@ class ModelsSettingsViewModel @Inject constructor(
     val state: StateFlow<ModelsSettingsState> = _state.asStateFlow()
 
     private val categories = listOf(
-    "text" to "نموذج نصوص",
-    "image" to "نموذج توليد الصور",
-    "video" to "نموذج تحويل الصورة إلى فيديو",
-    "tts" to "نموذج تحويل النص إلى صوت",
-    "analysis" to "نموذج التحليل والمعالجة",
-    "reviewer" to "نموذج مراجعة وتصحيح",
-    "orchestrator" to "نموذج التنسيق العام",
-    "music" to "نموذج توليد موسيقى",
-    "transition" to "نموذج الانتقالات",
-    "subtitle" to "نموذج الترجمة",
-    "ffmpeg" to "نموذج أوامر FFmpeg"
-)
+        "text" to "نموذج نصوص",
+        "image" to "نموذج توليد الصور",
+        "video" to "نموذج تحويل الصورة إلى فيديو",
+        "tts" to "نموذج تحويل النص إلى صوت",
+        "analysis" to "نموذج التحليل والمعالجة",
+        "reviewer" to "نموذج مراجعة وتصحيح",
+        "orchestrator" to "نموذج التنسيق العام",
+        "music" to "نموذج توليد موسيقى",
+        "transition" to "نموذج الانتقالات",
+        "subtitle" to "نموذج الترجمة",
+        "ffmpeg" to "نموذج أوامر FFmpeg"
+    )
 
     init {
         loadSettings()
@@ -49,7 +49,6 @@ class ModelsSettingsViewModel @Inject constructor(
 
     private fun loadSettings() {
         viewModelScope.launch {
-            // قراءة المفاتيح من ISettingsRepository (مشفرة)
             val geminiKey = secureSettingsRepo.getGeminiKey() ?: ""
             val hfToken = secureSettingsRepo.getHuggingFaceToken() ?: ""
             val elevenKey = secureSettingsRepo.getElevenLabsKey() ?: ""
@@ -59,12 +58,11 @@ class ModelsSettingsViewModel @Inject constructor(
             val pexelsKey = secureSettingsRepo.getPexelsKey() ?: ""
             val freesoundKey = secureSettingsRepo.getFreesoundKey() ?: ""
 
-            // قراءة الإعدادات العامة من AppSettingsRepository
             val geminiUrl = appSettingsRepo.getStringOnce("gemini_url", "")
             val ttsUrl = appSettingsRepo.getStringOnce("tts_url", "")
             val ffmpegPath = appSettingsRepo.getStringOnce("ffmpeg_path", "")
+            val geminiKeysCsv = appSettingsRepo.getGeminiKeysCsv()   // ✅ جديد
 
-            // قراءة النماذج المختارة (هذه إعدادات عامة)
             val selected = categories.mapNotNull { (category, _) ->
                 val modelId = appSettingsRepo.getStringOnce("selected_model_$category", "")
                 if (modelId.isNotBlank()) category to modelId else null
@@ -91,6 +89,7 @@ class ModelsSettingsViewModel @Inject constructor(
                     pixabayApiKey = pixabayKey,
                     pexelsApiKey = pexelsKey,
                     freesoundApiKey = freesoundKey,
+                    geminiKeysCsv = geminiKeysCsv,
                     selectedModels = selected,
                     ttsVoiceSamplePath = ttsSamplePath,
                     ttsUseVoiceClone = ttsUseClone
@@ -116,7 +115,6 @@ class ModelsSettingsViewModel @Inject constructor(
         }
     }
 
-    // دوال تغيير القيم في الـ UI
     fun onGeminiKeyChanged(v: String) = _state.update { it.copy(geminiApiKey = v) }
     fun onGeminiUrlChanged(v: String) = _state.update { it.copy(geminiUrl = v) }
     fun onHuggingFaceTokenChanged(v: String) = _state.update { it.copy(huggingFaceToken = v) }
@@ -128,6 +126,7 @@ class ModelsSettingsViewModel @Inject constructor(
     fun onPixabayKeyChanged(v: String) = _state.update { it.copy(pixabayApiKey = v) }
     fun onPexelsKeyChanged(v: String) = _state.update { it.copy(pexelsApiKey = v) }
     fun onFreesoundKeyChanged(v: String) = _state.update { it.copy(freesoundApiKey = v) }
+    fun onGeminiKeysChanged(csv: String) = _state.update { it.copy(geminiKeysCsv = csv) }   // ✅ جديد
 
     fun onVoiceSamplePathChanged(path: String) {
         _state.update { it.copy(ttsVoiceSamplePath = path) }
@@ -162,7 +161,6 @@ class ModelsSettingsViewModel @Inject constructor(
             _state.update { it.copy(isSaving = true, errorMessage = null, saveSuccessMessage = null) }
             try {
                 val s = _state.value
-                // حفظ المفاتيح في ISettingsRepository (مشفر)
                 secureSettingsRepo.saveGeminiKey(s.geminiApiKey)
                 secureSettingsRepo.saveHuggingFaceToken(s.huggingFaceToken)
                 secureSettingsRepo.saveElevenLabsKey(s.elevenLabsApiKey)
@@ -172,17 +170,15 @@ class ModelsSettingsViewModel @Inject constructor(
                 secureSettingsRepo.savePexelsKey(s.pexelsApiKey)
                 secureSettingsRepo.saveFreesoundKey(s.freesoundApiKey)
 
-                // حفظ الإعدادات العامة في AppSettingsRepository
                 appSettingsRepo.setString("gemini_url", s.geminiUrl)
                 appSettingsRepo.setString("tts_url", s.ttsUrl)
                 appSettingsRepo.setString("ffmpeg_path", s.ffmpegPath)
+                appSettingsRepo.setGeminiKeysCsv(s.geminiKeysCsv)   // ✅ جديد
 
-                // حفظ النماذج المختارة
                 s.selectedModels.forEach { (category, modelId) ->
                     appSettingsRepo.setString("selected_model_$category", modelId)
                 }
 
-                // حفظ إعدادات استنساخ الصوت
                 val currentTtsModelId = s.selectedModels["tts"] ?: ""
                 if (currentTtsModelId.isNotBlank()) {
                     appSettingsRepo.setString("tts_voice_sample_${currentTtsModelId}", s.ttsVoiceSamplePath)
