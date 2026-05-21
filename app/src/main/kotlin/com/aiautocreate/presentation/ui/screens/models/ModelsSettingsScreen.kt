@@ -142,6 +142,24 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
             )
             Spacer(modifier = Modifier.height(Spacing.md))
 
+            // بعد OutlinedTextField الخاص بـ Gemini API Key
+Spacer(modifier = Modifier.height(Spacing.md))
+
+OutlinedTextField(
+    value = state.geminiKeysCsv,
+    onValueChange = { viewModel.onGeminiKeysChanged(it) },
+    label = { Text("قائمة مفاتيح Gemini (مفصولة بفواصل)") },
+    placeholder = { Text("مثال: AIza..., AIza..., AIza...") },
+    modifier = Modifier.fillMaxWidth(),
+    singleLine = false,
+    maxLines = 5,
+    colors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = PrimaryLight,
+        unfocusedBorderColor = BorderInput,
+        cursorColor = PrimaryLight
+    )
+)
+            
             OutlinedTextField(
                 value = state.huggingFaceToken,
                 onValueChange = { viewModel.onHuggingFaceTokenChanged(it) },
