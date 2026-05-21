@@ -19,7 +19,7 @@ class ModelsManagerViewModel @Inject constructor(
     private val manageModelsUseCase: ManageModelsUseCase,
     private val checkApiModelsUseCase: CheckApiModelsUseCase,
     private val huggingFaceApi: HuggingFaceApi,
-    private val secureSettingsRepo: ISettingsRepository   // ✅ استخدام الواجهة الموحدة
+    private val secureSettingsRepo: ISettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -31,9 +31,14 @@ class ModelsManagerViewModel @Inject constructor(
 
     private fun loadModels() {
         viewModelScope.launch {
+            // ✅ تحويل تغييرات حالة المفاتيح إلى خريطة الحالات لكل مزود
+            val apiStatusFlow = secureSettingsRepo.observeHasApiKeys()
+                .map { checkApiModelsUseCase.checkAll() }
+                .catch { emit(emptyMap()) }
+
             combine(
                 manageModelsUseCase.getAllModels(),
-                flowOf(checkApiModelsUseCase.checkAll())
+                apiStatusFlow
             ) { models, apiStatus ->
                 models.map { model ->
                     val hasKey = apiStatus[model.provider] ?: false
@@ -65,8 +70,6 @@ class ModelsManagerViewModel @Inject constructor(
             loadModels()
         }
     }
-
-    // ==================== دوال إضافة النموذج ====================
 
     private suspend fun getHuggingFaceToken(): String {
         return secureSettingsRepo.getHuggingFaceToken() ?: ""
@@ -125,8 +128,7 @@ class ModelsManagerViewModel @Inject constructor(
             }
         }
     }
-    // باقي الدوال (updateEditableModel, addModelFromSearch, searchModelsByCategory) كما هي دون تغيير
-    // ...
+
     fun updateEditableModel(customName: String, customDescription: String) {
         _state.update { state ->
             val current = state.editableModel ?: return@update state
@@ -203,8 +205,6 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    // ==================== دوال البحث حسب الفئة ====================
-
     fun setSelectedCategory(category: String) {
         _state.update { it.copy(selectedCategoryForSearch = category) }
     }
@@ -253,32 +253,22 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    // ==================== دوال مساعدة ====================
-   private fun guessCategoryFromPipelineTag(tag: String?): String {
-    return when (tag?.lowercase()) {
-        // نصوص
-        "text-generation", "text2text-generation", "translation", "summarization",
-        "question-answering", "conversational", "text-to-text", "fill-mask",
-        "zero-shot-classification", "sentence-similarity", "feature-extraction" -> "text"
-        // صور
-        "text-to-image", "image-to-image", "image-enhancement", "image-segmentation",
-        "image-classification", "object-detection" -> "image"
-        // فيديو
-        "image-to-video", "video-generation", "text-to-video", "video-to-video",
-        "video-classification" -> "video"
-        // صوت (TTS)
-        "text-to-speech", "text-to-audio", "audio-to-audio" -> "tts"
-        // تحليل ومعالجة (ASR وغيرها)
-        "automatic-speech-recognition", "audio-classification", "voice-activity-detection" -> "analysis"
-        // موسيقى
-        "text-to-music", "music-generation", "audio-generation" -> "music"
-        // انتقالات (ليس شائعاً في HuggingFace، يترك افتراضياً)
-        "video-transition", "transition" -> "transition"
-        // أوامر FFmpeg (نادر)
-        "code-generation", "command-generation", "text-to-bash", "shell-command" -> "ffmpeg"
-        // الترجمة (يمكن وضعها ضمن نصوص أو subtitle)
-        "translation" -> "subtitle"  // أو "text" حسب رغبتك
-        else -> "analysis"
+    private fun guessCategoryFromPipelineTag(tag: String?): String {
+        return when (tag?.lowercase()) {
+            "text-generation", "text2text-generation", "translation", "summarization",
+            "question-answering", "conversational", "text-to-text", "fill-mask",
+            "zero-shot-classification", "sentence-similarity", "feature-extraction" -> "text"
+            "text-to-image", "image-to-image", "image-enhancement", "image-segmentation",
+            "image-classification", "object-detection" -> "image"
+            "image-to-video", "video-generation", "text-to-video", "video-to-video",
+            "video-classification" -> "video"
+            "text-to-speech", "text-to-audio", "audio-to-audio" -> "tts"
+            "automatic-speech-recognition", "audio-classification", "voice-activity-detection" -> "analysis"
+            "text-to-music", "music-generation", "audio-generation" -> "music"
+            "video-transition", "transition" -> "transition"
+            "code-generation", "command-generation", "text-to-bash", "shell-command" -> "ffmpeg"
+            "translation" -> "subtitle"
+            else -> "analysis"
+        }
     }
-  }
 }
