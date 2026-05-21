@@ -14,12 +14,12 @@ class DefaultModelsInitializer @Inject constructor(
 
     fun initializeIfNeeded() {
         runBlocking {
-            // 1. إضافة نموذج Gemini (فئة النصوص) - بالقوة
+            // 1. إضافة نموذج Gemini (فئة النصوص)
             val geminiModel = ModelConfig(
                 id = 0,
                 modelId = "gemini-2.0-flash",
                 modelName = "Gemini 2.0 Flash",
-                provider = "google",
+                provider = "gemini",   // ✅ تم التعديل هنا (كان "google")
                 isEnabled = true,
                 description = "نموذج Gemini من Google لتوليد النصوص وتحليلها ومعالجة المهام المتعددة.",
                 pipelineTag = "text-generation",
@@ -36,7 +36,6 @@ class DefaultModelsInitializer @Inject constructor(
                 parametersJson = null,
                 createdAt = System.currentTimeMillis()
             )
-            // إدراج النموذج بغض النظر عن وجوده (REPLACE)
             modelsRepository.insertModelConfig(geminiModel)
 
             // 2. إضافة نموذج Flan T5 Base (فئة التحليل) - إذا لم يكن موجوداً
