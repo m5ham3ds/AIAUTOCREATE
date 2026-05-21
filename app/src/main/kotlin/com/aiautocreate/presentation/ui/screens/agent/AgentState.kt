@@ -22,10 +22,13 @@ data class AgentState(
     val stats: AgentStats? = null,
     val isRefreshingStats: Boolean = false,
 
+    // ✅ حالات أزرار التحليلات
+    val isPerformingQuickScan: Boolean = false,
+    val isPerformingFullAnalysis: Boolean = false,
+    val isCheckingErrors: Boolean = false,
+
     val isLoading: Boolean = true
 )
-
-// باقي النماذج كما هي (ChatMessage, AgentIntervention, AgentPermissions)
 
 data class ChatMessage(
     val id: String,
