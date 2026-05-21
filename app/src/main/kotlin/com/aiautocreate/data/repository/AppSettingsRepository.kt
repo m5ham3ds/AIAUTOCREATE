@@ -94,6 +94,25 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 
+    // ✅ دوال قائمة مفاتيح Gemini (CSV)
+    suspend fun setGeminiKeysCsv(keysCsv: String) = setString("gemini_keys_csv", keysCsv)
+    suspend fun getGeminiKeysCsv(): String = getStringOnce("gemini_keys_csv", "")
+    suspend fun addToGeminiKeysCsv(newKey: String) {
+        val current = getGeminiKeysCsv()
+        val items = csvToList(current).toMutableList()
+        if (!items.contains(newKey)) {
+            items.add(newKey)
+            setGeminiKeysCsv(items.joinToString(","))
+        }
+    }
+    suspend fun removeFromGeminiKeysCsv(keyToRemove: String) {
+        val current = getGeminiKeysCsv()
+        val items = csvToList(current).toMutableList()
+        if (items.remove(keyToRemove)) {
+            setGeminiKeysCsv(items.joinToString(","))
+        }
+    }
+
     // ✅ دوال المسارات الجديدة (باستخدام المجلد الخاص بالتطبيق)
     private fun getAppRoot(): String {
         val context = AIAutoCreateApp.instance
@@ -158,12 +177,12 @@ class AppSettingsRepository @Inject constructor(
     }
 
     suspend fun getCacheAssetsDir(): String {
-    return getStringOnce("cache_assets", "${getAppRoot()}/AIAutoCreate/CACHE/ASSETS")
-}
+        return getStringOnce("cache_assets", "${getAppRoot()}/AIAutoCreate/CACHE/ASSETS")
+    }
 
-suspend fun getErrorsDir(): String {
-    return getStringOnce("path_errors", "${getAppRoot()}/AIAutoCreate/ERRORS")
-}
+    suspend fun getErrorsDir(): String {
+        return getStringOnce("path_errors", "${getAppRoot()}/AIAutoCreate/ERRORS")
+    }
     
     suspend fun removeFromCsv(key: String, itemToRemove: String) {
         val current = getStringOnce(key, "")
