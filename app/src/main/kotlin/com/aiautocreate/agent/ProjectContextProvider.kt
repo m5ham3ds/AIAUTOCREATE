@@ -16,6 +16,7 @@ class ProjectContextProvider @Inject constructor(
     private val settingsRepo: AppSettingsRepository
 ) {
 
+    // سياق كامل (للتحليل الشامل)
     suspend fun getFullContext(): String {
         val projects = projectRepo.getAllProjects().first()
         val enabledModels = modelsRepo.getEnabledModels().first()
@@ -62,6 +63,36 @@ class ProjectContextProvider @Inject constructor(
                 }
             } else {
                 appendLine("لا توجد أخطاء حديثة.")
+            }
+        }
+    }
+
+    // سياق سريع (للردود العادية والفحص السريع)
+    suspend fun getQuickContext(): String {
+        val projects = projectRepo.getAllProjects().first()
+        val enabledModels = modelsRepo.getEnabledModels().first()
+        val recentErrors = activityLogRepo.getAllLogs().first()
+            .filter { !it.isSuccess }.take(2)
+        return buildString {
+            appendLine("المشاريع: ${projects.size}")
+            appendLine("النماذج النشطة: ${enabledModels.size}")
+            if (recentErrors.isNotEmpty()) {
+                appendLine("آخر خطأين: ${recentErrors.joinToString { it.title }}")
+            } else {
+                appendLine("لا توجد أخطاء حديثة.")
+            }
+        }
+    }
+
+    // سياق الأخطاء فقط (لفحص الأخطاء الخطيرة)
+    suspend fun getErrorContext(): String {
+        val errors = activityLogRepo.getAllLogs().first()
+            .filter { !it.isSuccess }.take(10)
+        return if (errors.isEmpty()) "لا توجد أخطاء مسجلة."
+        else buildString {
+            appendLine("قائمة الأخطاء (آخر 10):")
+            errors.forEach { error ->
+                appendLine("- [${error.type}] ${error.title}: ${error.description.take(100)}")
             }
         }
     }
