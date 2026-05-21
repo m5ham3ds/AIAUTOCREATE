@@ -67,7 +67,6 @@ fun AgentScreen(
 
             Spacer(Modifier.height(Spacing.md))
 
-            // التبويبات: الدردشة، سجل التدخلات، الصلاحيات، الإحصائيات
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -119,6 +118,45 @@ private fun RowScope.AgentTab(text: String, tabIndex: Int, selectedTab: Int, onC
 @Composable
 private fun ChatTab(state: AgentState, viewModel: AgentViewModel, listState: LazyListState) {
     Column(Modifier.fillMaxSize()) {
+        // ✅ صف الأزرار الثلاثة
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            AssistChip(
+                onClick = { viewModel.performQuickScan() },
+                label = { Text("⚡ فحص سريع", fontSize = AppFontSize.bodySmall) },
+                enabled = !state.isPerformingQuickScan && !state.isChatLoading,
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = CardSoft,
+                    labelColor = TextPrimary
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            AssistChip(
+                onClick = { viewModel.performFullAnalysis() },
+                label = { Text("📊 تحليل شامل", fontSize = AppFontSize.bodySmall) },
+                enabled = !state.isPerformingFullAnalysis && !state.isChatLoading,
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = CardSoft,
+                    labelColor = TextPrimary
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            AssistChip(
+                onClick = { viewModel.performCriticalErrorsCheck() },
+                label = { Text("⚠️ أخطاء خطيرة", fontSize = AppFontSize.bodySmall) },
+                enabled = !state.isCheckingErrors && !state.isChatLoading,
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = CardSoft,
+                    labelColor = TextPrimary
+                ),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
         LazyColumn(
             Modifier
                 .weight(1f)
@@ -393,7 +431,6 @@ private fun PermissionRow(iconRes: Int, title: String, checked: Boolean, onToggl
     }
 }
 
-// ✅ تبويب الإحصائيات الجديد
 @Composable
 private fun StatsTab(state: AgentState, viewModel: AgentViewModel) {
     val stats = state.stats
