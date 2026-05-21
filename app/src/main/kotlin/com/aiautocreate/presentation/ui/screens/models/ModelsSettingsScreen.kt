@@ -170,6 +170,24 @@ OutlinedTextField(
             )
             Spacer(modifier = Modifier.height(Spacing.md))
 
+// بعد OutlinedTextField الخاص بـ HuggingFace Token
+Spacer(modifier = Modifier.height(Spacing.md))
+
+OutlinedTextField(
+    value = state.huggingFaceTokensCsv,
+    onValueChange = { viewModel.onHuggingFaceTokensChanged(it) },
+    label = { Text("قائمة توكنات HuggingFace (مفصولة بفواصل)") },
+    placeholder = { Text("مثال: hf_token1, hf_token2, hf_token3") },
+    modifier = Modifier.fillMaxWidth(),
+    singleLine = false,
+    maxLines = 5,
+    colors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = PrimaryLight,
+        unfocusedBorderColor = BorderInput,
+        cursorColor = PrimaryLight
+    )
+)
+            
             OutlinedTextField(
                 value = state.ttsUrl,
                 onValueChange = { viewModel.onTtsUrlChanged(it) },
