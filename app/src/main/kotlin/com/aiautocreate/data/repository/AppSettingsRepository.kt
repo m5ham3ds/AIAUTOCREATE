@@ -113,25 +113,37 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 
-// ✅ دوال قائمة توكنات HuggingFace (CSV)
-suspend fun setHuggingFaceTokensCsv(tokensCsv: String) = setString("hf_tokens_csv", tokensCsv)
-suspend fun getHuggingFaceTokensCsv(): String = getStringOnce("hf_tokens_csv", "")
-suspend fun addToHuggingFaceTokensCsv(newToken: String) {
-    val current = getHuggingFaceTokensCsv()
-    val items = csvToList(current).toMutableList()
-    if (!items.contains(newToken)) {
-        items.add(newToken)
-        setHuggingFaceTokensCsv(items.joinToString(","))
+    // ✅ دوال قائمة توكنات HuggingFace (CSV)
+    suspend fun setHuggingFaceTokensCsv(tokensCsv: String) = setString("hf_tokens_csv", tokensCsv)
+    suspend fun getHuggingFaceTokensCsv(): String = getStringOnce("hf_tokens_csv", "")
+    suspend fun addToHuggingFaceTokensCsv(newToken: String) {
+        val current = getHuggingFaceTokensCsv()
+        val items = csvToList(current).toMutableList()
+        if (!items.contains(newToken)) {
+            items.add(newToken)
+            setHuggingFaceTokensCsv(items.joinToString(","))
+        }
     }
-}
-suspend fun removeFromHuggingFaceTokensCsv(tokenToRemove: String) {
-    val current = getHuggingFaceTokensCsv()
-    val items = csvToList(current).toMutableList()
-    if (items.remove(tokenToRemove)) {
-        setHuggingFaceTokensCsv(items.joinToString(","))
+    suspend fun removeFromHuggingFaceTokensCsv(tokenToRemove: String) {
+        val current = getHuggingFaceTokensCsv()
+        val items = csvToList(current).toMutableList()
+        if (items.remove(tokenToRemove)) {
+            setHuggingFaceTokensCsv(items.joinToString(","))
+        }
     }
-}
-    
+
+    // ✅ دوال إعدادات الوكيل
+    suspend fun getDefaultAgentModelId(): String = getStringOnce("default_agent_model_id", "")
+    suspend fun setDefaultAgentModelId(modelId: String) = setString("default_agent_model_id", modelId)
+
+    suspend fun getFallbackAgentModelsOrder(): List<String> {
+        val csv = getStringOnce("fallback_agent_models_order", "")
+        return if (csv.isNotBlank()) csvToList(csv) else emptyList()
+    }
+    suspend fun setFallbackAgentModelsOrder(modelIds: List<String>) {
+        setString("fallback_agent_models_order", modelIds.joinToString(","))
+    }
+
     // ✅ دوال المسارات الجديدة (باستخدام المجلد الخاص بالتطبيق)
     private fun getAppRoot(): String {
         val context = AIAutoCreateApp.instance
@@ -202,7 +214,7 @@ suspend fun removeFromHuggingFaceTokensCsv(tokenToRemove: String) {
     suspend fun getErrorsDir(): String {
         return getStringOnce("path_errors", "${getAppRoot()}/AIAutoCreate/ERRORS")
     }
-    
+
     suspend fun removeFromCsv(key: String, itemToRemove: String) {
         val current = getStringOnce(key, "")
         val items = csvToList(current).toMutableList()
@@ -210,18 +222,6 @@ suspend fun removeFromHuggingFaceTokensCsv(tokenToRemove: String) {
             setString(key, items.joinToString(","))
         }
     }
-}
-
-// ✅ دوال إعدادات الوكيل
-suspend fun getDefaultAgentModelId(): String = getStringOnce("default_agent_model_id", "")
-suspend fun setDefaultAgentModelId(modelId: String) = setString("default_agent_model_id", modelId)
-
-suspend fun getFallbackAgentModelsOrder(): List<String> {
-    val csv = getStringOnce("fallback_agent_models_order", "")
-    return if (csv.isNotBlank()) csvToList(csv) else emptyList()
-}
-suspend fun setFallbackAgentModelsOrder(modelIds: List<String>) {
-    setString("fallback_agent_models_order", modelIds.joinToString(","))
 }
 
 // ================== Extensions ==================
