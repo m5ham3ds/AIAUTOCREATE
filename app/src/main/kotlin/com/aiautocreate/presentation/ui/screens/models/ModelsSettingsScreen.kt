@@ -451,4 +451,113 @@ private fun VoiceCloneSection(state: ModelsSettingsState, viewModel: ModelsSetti
             }
         }
     }
+
+// ✅ قسم إعدادات الوكيل
+Box(
+    modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = Spacing.lg)
+        .clip(RoundedCornerShape(Radius.xxl))
+        .background(CardPrimary)
+        .padding(Spacing.lg)
+) {
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painterResource(id = R.drawable.ic_smart_toy),
+                contentDescription = "Agent Settings",
+                modifier = Modifier.size(IconSize.lg),
+                tint = PrimaryLight
+            )
+            Text(
+                "إعدادات الوكيل الذكي",
+                Modifier.weight(1f),
+                textAlign = TextAlign.End,
+                color = TextPrimary,
+                fontSize = AppFontSize.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md), color = BorderSecondary)
+
+        // النموذج الأساسي
+        val textModels = state.availableModelsByCategory["text"] ?: emptyList()
+        val defaultModelId = state.defaultAgentModelId
+        var defaultModelDropdownExpanded by remember { mutableStateOf(false) }
+
+        Text(
+            "النموذج الأساسي للوكيل",
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.End,
+            color = TextHint,
+            fontSize = AppFontSize.bodyLarge
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ComponentSize.buttonHeightLg)
+                .clip(RoundedCornerShape(Radius.lg))
+                .background(CardSecondary)
+                .clickable { defaultModelDropdownExpanded = true }
+                .padding(horizontal = Spacing.lg),
+            contentAlignment = Alignment.Center
+        ) {
+            val selectedName = textModels.find { it.modelId == defaultModelId }?.modelName ?: "اختر نموذجاً"
+            Text(
+                selectedName,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.End,
+                color = TextPrimary,
+                fontSize = AppFontSize.bodyMedium
+            )
+        }
+        DropdownMenu(
+            expanded = defaultModelDropdownExpanded,
+            onDismissRequest = { defaultModelDropdownExpanded = false }
+        ) {
+            textModels.forEach { model ->
+                DropdownMenuItem(
+                    text = { Text(model.modelName) },
+                    onClick = {
+                        viewModel.onDefaultAgentModelChanged(model.modelId)
+                        defaultModelDropdownExpanded = false
+                    }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+
+        // ترتيب النماذج الاحتياطية (قائمة قابلة للسحب – نسخة مبسطة)
+        Text(
+            "ترتيب النماذج الاحتياطية (اسحب لإعادة الترتيب)",
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.End,
+            color = TextHint,
+            fontSize = AppFontSize.bodySmall
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        // هنا يمكن إضافة قائمة قابلة للسحب، لكن سنكتفي بعرضها كنص CSV مؤقتاً
+        // يمكن تحسينها لاحقاً
+        OutlinedTextField(
+            value = state.fallbackAgentModelsOrder.joinToString(", "),
+            onValueChange = { csv ->
+                val newOrder = csv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                viewModel.onFallbackAgentModelsOrderChanged(newOrder)
+            },
+            label = { Text("معرفات النماذج الاحتياطية (مفصولة بفواصل)") },
+            placeholder = { Text("gemini-2.0-flash, Qwen/Qwen2.5-7B-Instruct, ...") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = false,
+            maxLines = 3,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PrimaryLight,
+                unfocusedBorderColor = BorderInput,
+                cursorColor = PrimaryLight
+            )
+        )
+    }
+}
+    
 }
