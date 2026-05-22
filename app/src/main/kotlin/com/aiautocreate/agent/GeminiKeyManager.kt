@@ -16,7 +16,6 @@ class GeminiKeyManager @Inject constructor(
     private val mutex = Mutex()
     private var currentKeyIndex = 0
     private var lastSuccessfulKey: String? = null
-
     private var cachedKeys: List<String> = emptyList()
 
     suspend fun refreshKeys() {
@@ -45,12 +44,24 @@ class GeminiKeyManager @Inject constructor(
         }
     }
 
+    // ✅ دالة للتبديل عند أي فشل عام (مهلة، خطأ غير 429)
     suspend fun markFailureAndGetNext(): String? {
         mutex.withLock {
             if (cachedKeys.isEmpty()) return null
             currentKeyIndex = (currentKeyIndex + 1) % cachedKeys.size
             val nextKey = cachedKeys.getOrNull(currentKeyIndex)
-            Timber.w("المفتاح الحالي فشل، التبديل إلى المفتاح التالي (الفهرس $currentKeyIndex)")
+            Timber.w("المفتاح الحالي فشل (خطأ غير 429)، التبديل إلى التالي (الفهرس $currentKeyIndex)")
+            return nextKey
+        }
+    }
+
+    // ✅ دالة مخصصة للتبديل عند تجاوز الحد (429)
+    suspend fun markRateLimitAndGetNext(): String? {
+        mutex.withLock {
+            if (cachedKeys.isEmpty()) return null
+            currentKeyIndex = (currentKeyIndex + 1) % cachedKeys.size
+            val nextKey = cachedKeys.getOrNull(currentKeyIndex)
+            Timber.w("المفتاح الحالي تجاوز الحد (429)، التبديل إلى التالي (الفهرس $currentKeyIndex)")
             return nextKey
         }
     }
