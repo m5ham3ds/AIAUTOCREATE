@@ -14,8 +14,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
@@ -127,7 +125,7 @@ class AgentOrchestrator @Inject constructor(
         emitEvent(AgentEvent.InterventionLogged(intervention))
     }
 
-    // ==================== دوال الرد الرئيسية ====================
+    // ==================== دوال الرد الرئيسية (مع دعم عدة نماذج) ====================
     suspend fun getContextualAnswer(question: String, requestedModelId: String? = null): String {
         val context = contextProvider.getQuickContext()
         val defaultModelId = appSettingsRepo.getDefaultAgentModelId()
@@ -140,10 +138,15 @@ class AgentOrchestrator @Inject constructor(
         if (currentModelId != defaultModelId && defaultModelId.isNotBlank()) {
             modelsToTry.add(defaultModelId)
         }
-        modelsToTry.addAll(fallbackOrder.filter { it != currentModelId && it != defaultModelId && it.isNotBlank() })
+        // نضيف النماذج الاحتياطية بالترتيب المحدد
+        fallbackOrder.forEach { modelId ->
+            if (modelId != currentModelId && modelId != defaultModelId && !modelsToTry.contains(modelId)) {
+                modelsToTry.add(modelId)
+            }
+        }
 
         var lastError = ""
-        for (modelId in modelsToTry.distinct()) {
+        for (modelId in modelsToTry) {
             val model = allModels.find { it.modelId == modelId && it.isEnabled }
             if (model == null) {
                 lastError = "النموذج $modelId غير موجود أو معطل"
@@ -202,9 +205,15 @@ class AgentOrchestrator @Inject constructor(
                         geminiKeyManager.markRateLimitAndGetNext()
                         attempts++
                         continue
-                    } else return null
+                    } else {
+                        // أي خطأ آخر (مهلة، 500...) نعيد المحاولة بنفس المفتاح بعد تأخير بسيط
+                        delay(1000)
+                        continue
+                    }
                 }
-            } catch (e: Exception) { return null }
+            } catch (e: Exception) {
+                delay(1000)
+            }
         }
         return null
     }
@@ -242,10 +251,14 @@ class AgentOrchestrator @Inject constructor(
                         currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
                         attempts++
                         continue
-                    } else return null
+                    } else {
+                        // أخطاء مؤقتة نعيد المحاولة بنفس التوكن
+                        delay(1000)
+                        continue
+                    }
                 }
             } catch (e: Exception) {
-                return null
+                delay(1000)
             }
         }
         return null
@@ -321,7 +334,7 @@ class AgentOrchestrator @Inject constructor(
                     } else return null
                 }
             } catch (e: Exception) {
-                geminiKeyManager.markRateLimitAndGetNext()
+                geminiKeyManager.markFailureAndGetNext()
                 attempts++
             }
         }
