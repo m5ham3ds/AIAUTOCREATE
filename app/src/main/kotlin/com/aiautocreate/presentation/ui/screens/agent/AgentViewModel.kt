@@ -7,6 +7,7 @@ import com.aiautocreate.agent.AgentEvent
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.ProjectContextProvider
 import com.aiautocreate.data.repository.AppSettingsRepository
+import com.aiautocreate.domain.repository.IModelsRepository
 import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +21,8 @@ class AgentViewModel @Inject constructor(
     private val appSettingsRepo: AppSettingsRepository,
     private val secureSettingsRepo: ISettingsRepository,
     private val agentOrchestrator: AgentOrchestrator,
-    private val contextProvider: ProjectContextProvider
+    private val contextProvider: ProjectContextProvider,
+    private val modelsRepo: IModelsRepository   // ✅ جديد
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AgentState())
@@ -31,6 +33,8 @@ class AgentViewModel @Inject constructor(
         loadWelcomeMessage()
         observeAgentEvents()
         loadStats()
+        loadAvailableAgentModels()
+        loadAgentModelSettings()
     }
 
     private fun observeAgentEvents() {
@@ -118,6 +122,52 @@ class AgentViewModel @Inject constructor(
             isUser = false
         )
         _state.update { it.copy(chatMessages = listOf(welcome)) }
+    }
+
+    // ✅ تحميل النماذج المتاحة للوكيل (من فئة text والنشطة)
+    private fun loadAvailableAgentModels() {
+        viewModelScope.launch {
+            val allModels = modelsRepo.getAllModelConfigs().first()
+            val textModels = allModels.filter { it.isEnabled && it.category == "text" }
+            _state.update { it.copy(availableAgentModels = textModels) }
+        }
+    }
+
+    // ✅ تحميل إعدادات النموذج الحالي
+    private fun loadAgentModelSettings() {
+        viewModelScope.launch {
+            val defaultId = appSettingsRepo.getDefaultAgentModelId()
+            val tempId = appSettingsRepo.getStringOnce("temp_agent_model_id", "")
+            val isTemp = tempId.isNotBlank()
+            val currentId = if (isTemp) tempId else defaultId
+            _state.update {
+                it.copy(
+                    currentAgentModelId = currentId,
+                    isTempAgentModel = isTemp
+                )
+            }
+        }
+    }
+
+    // ✅ تعيين النموذج الحالي (مؤقت أو دائم)
+    fun setCurrentAgentModel(modelId: String, isTemporary: Boolean = true) {
+        viewModelScope.launch {
+            if (isTemporary) {
+                appSettingsRepo.setString("temp_agent_model_id", modelId)
+            } else {
+                appSettingsRepo.setDefaultAgentModelId(modelId)
+                appSettingsRepo.setString("temp_agent_model_id", "")
+            }
+            loadAgentModelSettings()
+        }
+    }
+
+    // ✅ إعادة تعيين إلى النموذج الأساسي
+    fun resetToDefaultAgentModel() {
+        viewModelScope.launch {
+            appSettingsRepo.setString("temp_agent_model_id", "")
+            loadAgentModelSettings()
+        }
     }
 
     fun onTabSelected(tab: Int) {
@@ -208,6 +258,7 @@ class AgentViewModel @Inject constructor(
         }
     }
 
+    // ✅ إرسال رسالة عادية مع استخدام النموذج الحالي
     fun sendMessage() {
         val text = _state.value.inputText.trim()
         if (text.isEmpty()) return
@@ -239,12 +290,12 @@ class AgentViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // التحقق من إذا كانت رسالة ترحيبية بسيطة
+                val currentModelId = _state.value.currentAgentModelId
                 val isGreeting = Regex("مرحب|اهلا|سلام|hello|hi|شكر", RegexOption.IGNORE_CASE).containsMatchIn(text)
                 val replyText = if (isGreeting) {
                     "مرحباً! كيف يمكنني مساعدتك اليوم؟ يمكنك استخدام الأزرار أعلاه للحصول على تحليل سريع أو شامل."
                 } else {
-                    agentOrchestrator.getContextualAnswer(text)
+                    agentOrchestrator.getContextualAnswer(text, currentModelId)
                 }
                 val agentMessage = ChatMessage(
                     id = UUID.randomUUID().toString(),
