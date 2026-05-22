@@ -1,6 +1,7 @@
 package com.aiautocreate.presentation.ui.screens.agent
 
 import com.aiautocreate.agent.AgentStats
+import com.aiautocreate.domain.model.ModelConfig
 import java.util.UUID
 
 data class AgentState(
@@ -26,6 +27,13 @@ data class AgentState(
     val isPerformingQuickScan: Boolean = false,
     val isPerformingFullAnalysis: Boolean = false,
     val isCheckingErrors: Boolean = false,
+
+    // ✅ النماذج المتاحة للوكيل (من فئة text والنشطة)
+    val availableAgentModels: List<ModelConfig> = emptyList(),
+    // ✅ النموذج الحالي المختار (مؤقت أو الأساسي)
+    val currentAgentModelId: String = "",
+    // ✅ هل النموذج الحالي مؤقت (من القائمة السريعة) أم أساسي؟
+    val isTempAgentModel: Boolean = false,
 
     val isLoading: Boolean = true
 )
