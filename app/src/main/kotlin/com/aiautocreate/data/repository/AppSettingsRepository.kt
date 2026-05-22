@@ -212,6 +212,18 @@ suspend fun removeFromHuggingFaceTokensCsv(tokenToRemove: String) {
     }
 }
 
+// ✅ دوال إعدادات الوكيل
+suspend fun getDefaultAgentModelId(): String = getStringOnce("default_agent_model_id", "")
+suspend fun setDefaultAgentModelId(modelId: String) = setString("default_agent_model_id", modelId)
+
+suspend fun getFallbackAgentModelsOrder(): List<String> {
+    val csv = getStringOnce("fallback_agent_models_order", "")
+    return if (csv.isNotBlank()) csvToList(csv) else emptyList()
+}
+suspend fun setFallbackAgentModelsOrder(modelIds: List<String>) {
+    setString("fallback_agent_models_order", modelIds.joinToString(","))
+}
+
 // ================== Extensions ==================
 fun DataStoreManager.getBoolFlow(key: String, default: Boolean): Flow<Boolean> {
     val prefKey = booleanPreferencesKey(key)
