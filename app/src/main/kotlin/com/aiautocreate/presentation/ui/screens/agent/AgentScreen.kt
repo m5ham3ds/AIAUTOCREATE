@@ -118,6 +118,58 @@ private fun RowScope.AgentTab(text: String, tabIndex: Int, selectedTab: Int, onC
 @Composable
 private fun ChatTab(state: AgentState, viewModel: AgentViewModel, listState: LazyListState) {
     Column(Modifier.fillMaxSize()) {
+        // ✅ قائمة اختيار النموذج السريع
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "النموذج الحالي:",
+                color = TextHint,
+                fontSize = AppFontSize.bodySmall
+            )
+            var expanded by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(Radius.md))
+                    .background(CardSoft)
+                    .clickable { expanded = true }
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                val currentModelName = state.availableAgentModels.find { it.modelId == state.currentAgentModelId }?.modelName ?: "اختر نموذجاً"
+                Text(currentModelName, color = TextPrimary, fontSize = AppFontSize.bodySmall)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                state.availableAgentModels.forEach { model ->
+                    DropdownMenuItem(
+                        text = { Text(model.modelName) },
+                        onClick = {
+                            viewModel.setCurrentAgentModel(model.modelId, isTemporary = true)
+                            expanded = false
+                        }
+                    )
+                }
+                if (state.isTempAgentModel) {
+                    DropdownMenuItem(
+                        text = { Text("↺ استخدام النموذج الأساسي", color = PrimaryLight) },
+                        onClick = {
+                            viewModel.resetToDefaultAgentModel()
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.xs))
+
         // ✅ صف الأزرار الثلاثة
         Row(
             modifier = Modifier
