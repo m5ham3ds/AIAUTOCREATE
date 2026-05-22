@@ -25,8 +25,8 @@ class ModelsSettingsViewModel @Inject constructor(
     private val modelsRepo: IModelsRepository,
     private val refreshStylesUseCase: RefreshModelsStylesUseCase,
     private val application: Application,
-    private val geminiKeyManager: GeminiKeyManager,      // ✅ حقن مدير مفاتيح Gemini
-    private val hfTokenManager: HuggingFaceTokenManager  // ✅ حقن مدير توكنات HuggingFace
+    private val geminiKeyManager: GeminiKeyManager,
+    private val hfTokenManager: HuggingFaceTokenManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsSettingsState())
@@ -67,6 +67,8 @@ class ModelsSettingsViewModel @Inject constructor(
             val ffmpegPath = appSettingsRepo.getStringOnce("ffmpeg_path", "")
             val geminiKeysCsv = appSettingsRepo.getGeminiKeysCsv()
             val huggingFaceTokensCsv = appSettingsRepo.getHuggingFaceTokensCsv()
+            val defaultAgentModelId = appSettingsRepo.getDefaultAgentModelId()
+            val fallbackOrder = appSettingsRepo.getFallbackAgentModelsOrder()
 
             val selected = categories.mapNotNull { (category, _) ->
                 val modelId = appSettingsRepo.getStringOnce("selected_model_$category", "")
@@ -96,6 +98,8 @@ class ModelsSettingsViewModel @Inject constructor(
                     freesoundApiKey = freesoundKey,
                     geminiKeysCsv = geminiKeysCsv,
                     huggingFaceTokensCsv = huggingFaceTokensCsv,
+                    defaultAgentModelId = defaultAgentModelId,
+                    fallbackAgentModelsOrder = fallbackOrder,
                     selectedModels = selected,
                     ttsVoiceSamplePath = ttsSamplePath,
                     ttsUseVoiceClone = ttsUseClone
@@ -134,6 +138,8 @@ class ModelsSettingsViewModel @Inject constructor(
     fun onFreesoundKeyChanged(v: String) = _state.update { it.copy(freesoundApiKey = v) }
     fun onGeminiKeysChanged(csv: String) = _state.update { it.copy(geminiKeysCsv = csv) }
     fun onHuggingFaceTokensChanged(csv: String) = _state.update { it.copy(huggingFaceTokensCsv = csv) }
+    fun onDefaultAgentModelChanged(modelId: String) = _state.update { it.copy(defaultAgentModelId = modelId) }
+    fun onFallbackAgentModelsOrderChanged(order: List<String>) = _state.update { it.copy(fallbackAgentModelsOrder = order) }
 
     fun onVoiceSamplePathChanged(path: String) {
         _state.update { it.copy(ttsVoiceSamplePath = path) }
@@ -182,8 +188,9 @@ class ModelsSettingsViewModel @Inject constructor(
                 appSettingsRepo.setString("ffmpeg_path", s.ffmpegPath)
                 appSettingsRepo.setGeminiKeysCsv(s.geminiKeysCsv)
                 appSettingsRepo.setHuggingFaceTokensCsv(s.huggingFaceTokensCsv)
+                appSettingsRepo.setDefaultAgentModelId(s.defaultAgentModelId)
+                appSettingsRepo.setFallbackAgentModelsOrder(s.fallbackAgentModelsOrder)
 
-                // تحديث قوائم المفاتيح في المديرين
                 geminiKeyManager.refreshKeys()
                 hfTokenManager.refreshTokens()
 
