@@ -45,14 +45,14 @@ interface HuggingFaceApi {
         @Header("Authorization") authorization: String = ""
     ): Response<ResponseBody>
 
-    // ✅ تعديل: استخدام URL كامل لأن base URL خاص بالـ inference، لكن معلومات النموذج تأتي من huggingface.co/api
+    // ✅ معلومات النموذج من HuggingFace API
     @GET("https://huggingface.co/api/models/{modelId}")
     suspend fun getModelInfo(
         @Path("modelId") modelId: String,
         @Header("Authorization") authorization: String = ""
     ): Response<HfModelInfo>
-    
-    // ✅ تعديل: نفس الشيء للبحث
+
+    // ✅ البحث حسب الفئة
     @GET("https://huggingface.co/api/models")
     suspend fun searchModelsByCategory(
         @Query("pipeline_tag") pipelineTag: String,
@@ -61,4 +61,12 @@ interface HuggingFaceApi {
         @Query("direction") direction: String = "-1",
         @Header("Authorization") authorization: String = ""
     ): Response<List<HfModelInfo>>
+
+    // ✅ توليد نص من نموذج HuggingFace (لنماذج الدردشة)
+    @POST("models/{modelId}")
+    suspend fun generateText(
+        @Path("modelId") modelId: String,
+        @Body request: Map<String, Any>,
+        @Header("Authorization") authorization: String
+    ): Response<ResponseBody>
 }
