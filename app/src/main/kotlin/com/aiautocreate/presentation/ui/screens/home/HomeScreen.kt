@@ -18,6 +18,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiautocreate.R
 import com.aiautocreate.presentation.common.components.*
@@ -30,10 +33,26 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // ✅ إعادة تحميل القوائم كلما ظهرت الشاشة (للتحديث التلقائي بعد تغيير النماذج أو أنماط المونتاج)
-    LaunchedEffect(Unit) {
-        viewModel.loadStylesAndSelections()
+    // ✅ عرض رسائل الخطأ عبر Snackbar
+    LaunchedEffect(state.errorMessage) {
+        state.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
+    // ✅ إعادة تحميل القوائم في كل مرة تظهر فيها الشاشة (بعد تغيير الإعدادات)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadStylesAndSelections()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(
@@ -78,7 +97,12 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold
                     )
 
-                    // ✅ قائمة الصور (أنماط النموذج المحدد للصور)
+                    DropdownSelector(
+                        label = state.selectedMontageStyle,
+                        options = state.montageStyles,
+                        onSelected = { viewModel.onMontageStyleSelected(it) }
+                    )
+
                     DropdownSelector(
                         label = state.selectedImageStyle,
                         options = state.imageStyles,
@@ -86,7 +110,6 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة الأغلفة (ثابتة)
                     DropdownSelector(
                         label = state.selectedCoverStyle,
                         options = state.coverStyles,
@@ -94,7 +117,6 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة الأصوات (أنماط النموذج المحدد للنص إلى صوت)
                     DropdownSelector(
                         label = state.selectedVoice,
                         options = state.voiceOptions,
@@ -102,20 +124,12 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // ✅ قائمة أساليب الفيديو (أنماط النموذج المحدد للفيديو)
                     DropdownSelector(
                         label = state.selectedVideoStyle,
                         options = state.videoStyles,
                         onSelected = { viewModel.onVideoStyleSelected(it) }
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
-
-                    // ✅ قائمة أساليب المونتاج (من إعدادات FFmpeg)
-                    DropdownSelector(
-                        label = state.selectedMontageStyle,
-                        options = state.montageStyles,
-                        onSelected = { viewModel.onMontageStyleSelected(it) }
-                    )
                 }
             }
 
@@ -229,32 +243,89 @@ fun HomeScreen(
                     maxLines = 3
                 )
                 Spacer(modifier = Modifier.width(Spacing.md))
+                // ✅ زر الإرسال يتحول إلى زر إلغاء أثناء المعالجة
                 IconButton(
-                    onClick = { viewModel.startProcessing() },
-                    enabled = state.promptText.isNotBlank() && !state.isProcessing,
+                    onClick = {
+                        if (state.isProcessing) {
+                            viewModel.showCancelDialog()
+                        } else {
+                            viewModel.startProcessing()
+                        }
+                    },
+                    enabled = !state.isProcessing || true, // زر الإلغاء مفعل دائماً
                     modifier = Modifier
                         .size(ComponentSize.fabSize)
                         .clip(RoundedCornerShape(Radius.round))
-                        .background(Primary)
+                        .background(if (state.isProcessing) ErrorRed else Primary)
                 ) {
                     if (state.isProcessing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(IconSize.md),
-                            color = TextPrimary,
-                            strokeWidth = Border.thick
-                        )
-                    } else {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_send),
-                            contentDescription = "إرسال",
+                            painter = painterResource(id = R.drawable.ic_stop),
+                            contentDescription = "إلغاء",
                             modifier = Modifier.size(IconSize.md),
                             tint = TextPrimary
                         )
+                    } else {
+                        if (state.isProcessing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(IconSize.md),
+                                color = TextPrimary,
+                                strokeWidth = Border.thick
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_send),
+                                contentDescription = "إرسال",
+                                modifier = Modifier.size(IconSize.md),
+                                tint = TextPrimary
+                            )
+                        }
                     }
                 }
             }
         }
     }
+
+    // ✅ حوار تأكيد إلغاء العملية
+    if (state.showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideCancelDialog() },
+            title = { Text("إلغاء العملية", fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت متأكد من إلغاء العملية الجارية؟ سيتم فقدان التقدم الحالي.") },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.cancelProcessing() },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                ) {
+                    Text("نعم، ألغِ العملية")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.hideCancelDialog() }) {
+                    Text("لا، استمر")
+                }
+            },
+            containerColor = CardPrimary,
+            titleContentColor = TextPrimary,
+            textContentColor = TextBody
+        )
+    }
+
+    // ✅ Snackbar لعرض الأخطاء
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(Spacing.lg),
+        snackbarHost = { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = CardDark,
+                contentColor = ErrorRed,
+                actionColor = PrimaryLight
+            )
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
