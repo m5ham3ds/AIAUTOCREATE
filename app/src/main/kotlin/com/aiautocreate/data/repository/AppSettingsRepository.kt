@@ -223,6 +223,11 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 }
+// إضافة هذه الدالة
+suspend fun getHuggingFaceToken(): String? {
+    val token = getStringOnce("hf_token", "")
+    return if (token.isNotBlank()) token else null
+}
 
 // ================== Extensions ==================
 fun DataStoreManager.getBoolFlow(key: String, default: Boolean): Flow<Boolean> {
