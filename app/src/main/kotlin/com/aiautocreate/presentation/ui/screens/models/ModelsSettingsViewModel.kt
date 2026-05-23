@@ -233,7 +233,6 @@ class ModelsSettingsViewModel @Inject constructor(
             }
 
             try {
-                // استخدام دالة إنشاء العمل المحسّنة من BackgroundStyleRefresher
                 val workRequest = BackgroundStyleRefresher.createWorkRequest()
                 WorkManager.getInstance(application).enqueue(workRequest)
 
@@ -243,10 +242,11 @@ class ModelsSettingsViewModel @Inject constructor(
                     .filter { it.state.isFinished }
                     .first()
                     .let { workInfo ->
-                        val updatedCount = workInfo.outputData.getInt(
+                        // ✅ استخدام ?. لتجنب NullPointerException
+                        val updatedCount = workInfo?.outputData?.getInt(
                             BackgroundStyleRefresher.KEY_UPDATED_MODELS_COUNT,
                             0
-                        )
+                        ) ?: 0
                         // إعادة تحميل النماذج في الـ UI بعد الانتهاء
                         loadModelsByCategory()
                         _state.update {
