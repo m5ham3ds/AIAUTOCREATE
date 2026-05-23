@@ -2,14 +2,11 @@ package com.aiautocreate.domain.pipeline
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.Asset
-import com.aiautocreate.data.asset.FreesoundAssetProvider
-import com.aiautocreate.data.asset.LotsOfSoundsAssetProvider
-import com.aiautocreate.data.asset.OpenVFXAssetProvider
-import com.aiautocreate.data.asset.PexelsAssetProvider
-import com.aiautocreate.data.asset.PixabayAssetProvider
+import com.aiautocreate.data.asset.*
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
@@ -24,7 +21,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import timber.log.Timber
 import java.io.*
-import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -69,6 +65,25 @@ sealed class PipelineEvent {
     data class FinalResult(val outputFile: String) : PipelineEvent()
 }
 
+data class SmartCountResult(
+    val audioFxCount: Int,
+    val visualFxCount: Int,
+    val transitionsCount: Int
+)
+
+data class OrchestrationPlan(
+    val enableMaster: Boolean,
+    val enableAudioFx: Boolean,
+    val enableVisualFx: Boolean,
+    val enableTransitions: Boolean,
+    val enableSmartCount: Boolean,
+    val enableSubtitles: Boolean,
+    val enableMusic: Boolean,
+    val enableReviewer: Boolean,
+    val enableExternalVideo: Boolean,
+    val enableExternalImage: Boolean
+)
+
 @Singleton
 class PipelineOrchestrator @Inject constructor(
     private val geminiApi: GeminiApi,
@@ -83,10 +98,12 @@ class PipelineOrchestrator @Inject constructor(
     private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
     private val freesoundProvider: FreesoundAssetProvider,
     private val openVfxProvider: OpenVFXAssetProvider,
+    private val localAssetProvider: LocalAssetProvider,
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
     private val assetProviders: Set<AssetProvider> = setOf(
+        localAssetProvider,
         pexelsProvider,
         pixabayProvider,
         lotsOfSoundsProvider,
@@ -110,7 +127,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 1. دالة التشغيل الرئيسية
+    // 1. دالة التشغيل الرئيسية (معدلة)
     // ----------------------------------------------
     suspend fun execute(config: PipelineConfig) {
         cancelled = false
@@ -125,27 +142,53 @@ class PipelineOrchestrator @Inject constructor(
         val audiosDir = ensureDir("$projectTempDir/AUDIOS")
         val videosDir = ensureDir("$projectTempDir/VIDEOS")
 
+        // ✅ حساب الأبعاد الهدف والمدة من إعدادات FFmpeg
+        val targetSize = computeTargetSize(config.aspect, config.quality)
+        val totalDurationSec = (config.minutes.toIntOrNull() ?: 1) * 60 + (config.seconds.toIntOrNull() ?: 30)
+
         try {
             emitLog("بدء معالجة الطلب: ${config.prompt}")
-            emitProgress("script", "توليد السيناريو...", 5)
+            emitLog("📐 الأبعاد المطلوبة: ${targetSize.first}x${targetSize.second}")
+            emitLog("⏱️ المدة المطلوبة: ${totalDurationSec / 60} دقيقة و ${totalDurationSec % 60} ثانية")
+            emitProgress("orchestrator", "تنسيق الخطة...", 1)
 
-            val scriptText = generateScript(config)
+            // ✅ 1. المنسق الرئيسي (Orchestrator)
+            val orchestrationPlan = orchestratePlan(config)
+
+            emitProgress("script", "توليد السيناريو...", 5)
+            // ✅ 2. توليد السيناريو مع المدة والأبعاد
+            val scriptText = generateScript(config, totalDurationSec, targetSize)
             emitProgress("script", "تم إنشاء السيناريو", 15)
 
             if (checkCancel()) return
-
             saveScriptAndExtract(scriptText, scriptsDir)
 
-            if (!hfQuotaExceeded) processImages(config, imagesDir, scriptsDir)
+            // ✅ 3. العدد الذكي (Smart Count)
+            val audioFile = File(audiosDir, "SCRIPTS_SSML_AU.wav")
+            val actualAudioDurationMs = if (audioFile.exists()) getAudioDuration(audioFile) else 0L
+            val smartCount = if (orchestrationPlan.enableSmartCount) {
+                smartCountAnalysis(config, scriptText, actualAudioDurationMs)
+            } else SmartCountResult(3, 2, 2)
+
+            // ✅ 4. المهام الفرعية
+            if (!hfQuotaExceeded) processImages(config, imagesDir, scriptsDir, smartCount.visualFxCount, targetSize)
             if (!hfQuotaExceeded) processTts(config, audiosDir, scriptsDir)
-            if (!hfQuotaExceeded) processVideo(config, videosDir, imagesDir, scriptsDir)
+            if (!hfQuotaExceeded) processVideo(config, videosDir, imagesDir, scriptsDir, smartCount.transitionsCount)
 
             emitProgress("video", "تجميع الفيديو النهائي...", 80)
-            val outputFile = assembleWithMontagePlan(config, scriptsDir, imagesDir, audiosDir, videosDir, projectTempDir, projectId)
+            val outputFile = assembleWithMontagePlan(
+                config, scriptsDir, imagesDir, audiosDir, videosDir,
+                projectTempDir, projectId, smartCount, orchestrationPlan, targetSize
+            )
             emitProgress("video", "اكتمل الفيديو", 100)
 
-            emitFinalResult(outputFile)
+            // ✅ 5. المراجع (Reviewer)
+            if (orchestrationPlan.enableReviewer) {
+                val review = reviewFinalVideo(outputFile, config)
+                if (review != null) emitLog("📝 مراجعة الوكيل: $review")
+            }
 
+            emitFinalResult(outputFile)
             cleanupTempFiles(projectTempDir)
         } catch (e: Exception) {
             if (!cancelled) {
@@ -159,12 +202,12 @@ class PipelineOrchestrator @Inject constructor(
     fun cancel() { cancelled = true }
     private suspend fun checkCancel(): Boolean = cancelled
 
-    // ----------------------------------------------
-    // 2. توليد السيناريو
-    // ----------------------------------------------
-    private suspend fun generateScript(config: PipelineConfig): String {
+    // ==================== دوال جديدة ====================
+
+    // ✅ توليد السيناريو مع المدة والأبعاد
+    private suspend fun generateScript(config: PipelineConfig, totalDurationSec: Int, targetSize: Pair<Int, Int>): String {
         try {
-            val prompt = buildGeminiPrompt(config)
+            val prompt = buildGeminiPrompt(config, totalDurationSec, targetSize)
             val request = GeminiRequestDto(contents = listOf(Content(parts = listOf(Part(text = prompt)))))
             val response = geminiApi.generateContentWithKey(request)
             if (response.isSuccessful) {
@@ -181,13 +224,13 @@ class PipelineOrchestrator @Inject constructor(
         }
     }
 
-    private fun buildGeminiPrompt(config: PipelineConfig): String {
-        val durationDesc = "${config.minutes} دقيقة و ${config.seconds} ثانية"
+    private fun buildGeminiPrompt(config: PipelineConfig, totalDurationSec: Int, targetSize: Pair<Int, Int>): String {
+        val durationDesc = "${totalDurationSec / 60} دقيقة و ${totalDurationSec % 60} ثانية"
         return """
 المطلوب: ${config.prompt}
 مدة الفيديو: $durationDesc
 الجودة: ${config.quality}
-الأبعاد: ${config.aspect}
+الأبعاد: ${targetSize.first}x${targetSize.second} (نسبة العرض ${config.aspect})
 لغة كتابة القصة تعتمد على اللغة المكتوب بها نص الطلب.
 
 الآن بعد كتابة القصة كاملة، يجب أن تُخرج نسخة أخرى بصيغة SSML قياسية للتحويل إلى صوت.
@@ -195,7 +238,7 @@ class PipelineOrchestrator @Inject constructor(
 - قسّم القصة إلى مشاهد.
 - كل مشهد يتضمن:
    * نص المشهد.
-   * برومبت صورة المشهد محصوراً بين 😶...😶 وبالإنجليزية.
+   * برومبت صورة المشهد محصوراً بين 😶...😶 وبالإنجليزية، ويجب أن تتطابق أبعاد الصورة مع ${targetSize.first}x${targetSize.second}.
    * برومبت حركة المشهد محصوراً بين 🥱...🥱 وبالإنجليزية.
 - برومبتات المشاهد تسمى بالتسلسل: MSHHD1، MSHHD2 ...
 - برومبتات تحريك المشاهد تسمى: HAREKA1، HAREKA2 ...
@@ -204,6 +247,118 @@ class PipelineOrchestrator @Inject constructor(
         """.trimIndent()
     }
 
+    // ✅ استخراج مدة الصوت الفعلية
+    private fun getAudioDuration(audioFile: File): Long {
+        return try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(audioFile.absolutePath)
+            val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            retriever.release()
+            durationStr?.toLongOrNull() ?: 0L
+        } catch (e: Exception) {
+            Timber.e(e, "فشل قراءة مدة الصوت")
+            0L
+        }
+    }
+
+    // ✅ تحليل العدد الذكي
+    private suspend fun smartCountAnalysis(config: PipelineConfig, scriptText: String, audioDurationMs: Long): SmartCountResult {
+        emitLog("🔢 بدء تحليل العدد الذكي...")
+        val modelId = if (config.masterModelId.isNotBlank()) config.masterModelId else config.smartSel ?: "google/flan-t5-base"
+        val token = settingsRepo.getHuggingFaceToken() ?: ""
+        if (token.isBlank()) {
+            emitLog("⚠️ لا يوجد توكن HuggingFace، استخدام القيم الافتراضية للعدد الذكي")
+            return SmartCountResult(3, 2, 2)
+        }
+        val prompt = """
+            أنت خبير في تحليل النصوص وتحديد عدد المؤثرات المناسبة.
+            النص: ${scriptText.take(800)}
+            مدة الصوت: ${audioDurationMs / 1000} ثانية.
+            حدد الأعداد التالية (أعداد صحيحة فقط):
+            - عدد المؤثرات الصوتية (audioFxCount): مناسب لعدد المشاهد.
+            - عدد المؤثرات البصرية (visualFxCount): مناسب لعدد المشاهد.
+            - عدد الانتقالات (transitionsCount): مناسب لعدد المشاهد.
+            أجب فقط بالأرقام مفصولة بفواصل، مثال: 4,3,3
+        """.trimIndent()
+        val response = try {
+            huggingFaceApi.generateText(modelId, mapOf("inputs" to prompt), "Bearer $token")
+        } catch (e: Exception) { null }
+        val text = response?.body()?.string() ?: "3,2,2"
+        val parts = text.split(",").map { it.trim().toIntOrNull() ?: 2 }
+        val result = SmartCountResult(
+            audioFxCount = parts.getOrElse(0) { 3 },
+            visualFxCount = parts.getOrElse(1) { 2 },
+            transitionsCount = parts.getOrElse(2) { 2 }
+        )
+        emitLog("✅ العدد الذكي: صوتي=${result.audioFxCount}, بصري=${result.visualFxCount}, انتقالات=${result.transitionsCount}")
+        return result
+    }
+
+    // ✅ المنسق الرئيسي
+    private suspend fun orchestratePlan(config: PipelineConfig): OrchestrationPlan {
+        emitLog("🎛️ تنسيق خطة المهام...")
+        val modelId = if (config.masterModelId.isNotBlank()) config.masterModelId else config.orch ?: "google/flan-t5-base"
+        val token = settingsRepo.getHuggingFaceToken() ?: ""
+        if (token.isBlank()) {
+            emitLog("⚠️ لا يوجد توكن HuggingFace، استخدام جميع المهام")
+            return OrchestrationPlan(
+                enableMaster = true, enableAudioFx = true, enableVisualFx = true,
+                enableTransitions = true, enableSmartCount = true, enableSubtitles = true,
+                enableMusic = true, enableReviewer = true, enableExternalVideo = true,
+                enableExternalImage = true
+            )
+        }
+        val prompt = """
+            أنت منسق مهام. بناءً على النماذج المتاحة والإعدادات:
+            النموذج الرئيسي: ${config.masterModelId}
+            نموذج المؤثرات الصوتية: ${config.audioFxModelId}
+            نموذج المؤثرات البصرية: ${config.visualFxModelId}
+            نموذج الانتقالات: ${config.transitionsModelId}
+            نموذج الترجمة: ${config.subtitlesModelId}
+            نموذج الموسيقى: ${config.musicModelId}
+            نموذج المراجع: ${config.reviewerModelId}
+            هل يجب تفعيل كل مهمة؟ أجب بـ true/false لكل مهمة بالترتيب:
+            master, audioFx, visualFx, transitions, smartCount, subtitles, music, reviewer, externalVideo, externalImage
+        """.trimIndent()
+        val response = try {
+            huggingFaceApi.generateText(modelId, mapOf("inputs" to prompt), "Bearer $token")
+        } catch (e: Exception) { null }
+        val text = response?.body()?.string() ?: "true,true,true,true,true,true,true,true,true,true"
+        val flags = text.split(",").map { it.trim().toBoolean() }
+        return OrchestrationPlan(
+            enableMaster = flags.getOrElse(0) { true },
+            enableAudioFx = flags.getOrElse(1) { true },
+            enableVisualFx = flags.getOrElse(2) { true },
+            enableTransitions = flags.getOrElse(3) { true },
+            enableSmartCount = flags.getOrElse(4) { true },
+            enableSubtitles = flags.getOrElse(5) { true },
+            enableMusic = flags.getOrElse(6) { true },
+            enableReviewer = flags.getOrElse(7) { true },
+            enableExternalVideo = flags.getOrElse(8) { true },
+            enableExternalImage = flags.getOrElse(9) { true }
+        )
+    }
+
+    // ✅ مراجعة الفيديو النهائي
+    private suspend fun reviewFinalVideo(outputPath: String, config: PipelineConfig): String? {
+        emitLog("📋 بدء مراجعة الفيديو النهائي...")
+        val modelId = if (config.masterModelId.isNotBlank()) config.masterModelId else config.reviewer ?: "google/flan-t5-base"
+        val token = settingsRepo.getHuggingFaceToken() ?: ""
+        if (token.isBlank()) return null
+        val prompt = """
+            أنت مراجع خبير. قم بمراجعة الفيديو النهائي بناءً على الطلب الأصلي:
+            الطلب: ${config.prompt}
+            أجب بتقييم (ممتاز/جيد/ضعيف) واقتراح تحسينات في سطر واحد.
+        """.trimIndent()
+        val response = try {
+            huggingFaceApi.generateText(modelId, mapOf("inputs" to prompt), "Bearer $token")
+        } catch (e: Exception) { null }
+        return response?.body()?.string()
+    }
+
+    // ----------------------------------------------
+    // 2. توليد السيناريو (المساعدة)
+    // ----------------------------------------------
     private suspend fun saveScriptAndExtract(scriptText: String, scriptsDir: File) {
         try {
             if (!scriptsDir.exists()) scriptsDir.mkdirs()
@@ -237,15 +392,14 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 3. توليد الصور
+    // 3. توليد الصور (معدل لاستخدام الأبعاد المطلوبة)
     // ----------------------------------------------
-    private suspend fun processImages(config: PipelineConfig, imagesDir: File, scriptsDir: File) {
+    private suspend fun processImages(config: PipelineConfig, imagesDir: File, scriptsDir: File, visualFxCount: Int, targetSize: Pair<Int, Int>) {
         if (hfQuotaExceeded) return
         val hfToken = settingsRepo.getStringOnce("hf_token", "")
         val sdModel = if (config.masterModelId.isNotBlank()) config.masterModelId else config.sdModel.ifEmpty { "stabilityai/stable-diffusion-xl-base-1.0" }
 
-        val targetSize = computeTargetSize(config.aspect, config.quality)
-        val genSize = computeGenSize(sdModel, config.aspect)
+        val genSize = targetSize  // ✅ استخدام الأبعاد المطلوبة مباشرة
         val preset = imagePresetForModel(sdModel)
 
         val mshhdFiles = scriptsDir.listFiles()
@@ -266,9 +420,8 @@ class PipelineOrchestrator @Inject constructor(
             val imgBytes = tryGenerateImageWithAgent(hfToken, sdModel, finalPrompt, genSize, preset, "image")
             if (imgBytes != null) {
                 val outFile = File(imagesDir, "MSHHD${idx}_MG.png")
-                val resized = resizeImageBytes(imgBytes, targetSize.first, targetSize.second)
-                outFile.writeBytes(resized)
-                emitLog("تم إنشاء ${outFile.name}")
+                outFile.writeBytes(imgBytes)  // لا حاجة لإعادة التحجيم
+                emitLog("تم إنشاء ${outFile.name} بحجم ${genSize.first}x${genSize.second}")
             } else {
                 emitLog("فشل توليد الصورة لـ MSHHD$idx")
             }
@@ -433,9 +586,9 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid)
+    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid) مع عدد الانتقالات
     // ----------------------------------------------
-    private suspend fun processVideo(config: PipelineConfig, videosDir: File, imagesDir: File, scriptsDir: File) {
+    private suspend fun processVideo(config: PipelineConfig, videosDir: File, imagesDir: File, scriptsDir: File, transitionsCount: Int) {
         if (hfQuotaExceeded) return
         val hfToken = settingsRepo.getStringOnce("hf_token", "")
         val img2VidModel = if (config.masterModelId.isNotBlank()) config.masterModelId else config.img2VidModel.ifEmpty { "stabilityai/stable-video-diffusion-img2vid" }
@@ -516,7 +669,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 6. تجميع الفيديو النهائي (مع AssetProvider)
+    // 6. تجميع الفيديو النهائي (معدل لاستخدام الأبعاد والعدد الذكي والخارجي)
     // ----------------------------------------------
     private suspend fun assembleWithMontagePlan(
         config: PipelineConfig,
@@ -525,12 +678,15 @@ class PipelineOrchestrator @Inject constructor(
         audiosDir: File,
         videosDir: File,
         projectTempDir: File,
-        projectId: Long
+        projectId: Long,
+        smartCount: SmartCountResult,
+        plan: OrchestrationPlan,
+        targetSize: Pair<Int, Int>
     ): String {
         val finalDir = ensureDir("$projectTempDir/FINAL")
         val outputPath = File(finalDir, "final_${System.currentTimeMillis()}.mp4").absolutePath
         try {
-            val montagePlan = buildMontagePlan(config, scriptsDir, imagesDir, audiosDir, videosDir, outputPath)
+            val montagePlan = buildMontagePlan(config, scriptsDir, imagesDir, audiosDir, videosDir, outputPath, smartCount, plan, targetSize)
             val command = commandBuilder.buildCommand(montagePlan)
             emitLog("أمر FFmpeg النهائي: ${command.take(200)}...")
             val result = FFmpegRunner.execute(command)
@@ -553,16 +709,20 @@ class PipelineOrchestrator @Inject constructor(
         imagesDir: File,
         audiosDir: File,
         videosDir: File,
-        outputPath: String
+        outputPath: String,
+        smartCount: SmartCountResult,
+        plan: OrchestrationPlan,
+        targetSize: Pair<Int, Int>
     ): MontagePlan {
         val style = config.montageStyle.ifEmpty { "قصص وروايات" }
         val profilePrefix = "profile_${style}_"
 
-        val useAudioFx = settingsRepo.getBoolFlag(profilePrefix + "audio_on", false)
-        val useVisualFx = settingsRepo.getBoolFlag(profilePrefix + "visual_on", false)
-        val useTransitions = settingsRepo.getBoolFlag(profilePrefix + "trans_on", false)
-        val useExternalVideo = settingsRepo.getBoolFlag(profilePrefix + "external_video_on", false)
-        val useExternalImage = settingsRepo.getBoolFlag(profilePrefix + "external_image_on", false)
+        val useAudioFx = plan.enableAudioFx && settingsRepo.getBoolFlag(profilePrefix + "audio_on", false)
+        val useVisualFx = plan.enableVisualFx && settingsRepo.getBoolFlag(profilePrefix + "visual_on", false)
+        val useTransitions = plan.enableTransitions && settingsRepo.getBoolFlag(profilePrefix + "trans_on", false)
+        val useExternalVideo = plan.enableExternalVideo && settingsRepo.getBoolFlag(profilePrefix + "external_video_on", false)
+        val useExternalImage = plan.enableExternalImage && settingsRepo.getBoolFlag(profilePrefix + "external_image_on", false)
+        val useMusic = plan.enableMusic && settingsRepo.getBoolFlag(profilePrefix + "music_on", false)
 
         val imageFiles = scriptsDir.listFiles()
             ?.filter { it.name.startsWith("MSHHD") && it.name.endsWith(".txt") }
@@ -572,7 +732,6 @@ class PipelineOrchestrator @Inject constructor(
         val totalDurationMs = ((config.minutes.toIntOrNull() ?: 1) * 60 + (config.seconds.toIntOrNull() ?: 30)) * 1000L
         val perSceneDurationMs = totalDurationMs / maxOf(1, imageFiles.size)
 
-        // ✅ استخدام mutableListOf لإمكانية الإضافة لاحقاً
         val inputs = imageFiles.mapIndexed { index, _ ->
             val imgFile = File(imagesDir, "MSHHD${index + 1}_MG.png")
             MontagePlan.MontageInput(
@@ -582,10 +741,11 @@ class PipelineOrchestrator @Inject constructor(
             )
         }.filter { it.path.isNotEmpty() }.toMutableList()
 
-        // 1. الانتقالات الذكية
+        // 1. الانتقالات (مع احترام العدد الذكي)
         val transitions = if (useTransitions && inputs.size > 1) {
             mutableListOf<MontagePlan.MontageTransition>().apply {
-                for (i in 0 until inputs.size - 1) {
+                val maxTrans = minOf(smartCount.transitionsCount, inputs.size - 1)
+                for (i in 0 until maxTrans) {
                     val prevScene = sceneDescriptions.getOrElse(i) { "" }
                     val nextScene = sceneDescriptions.getOrElse(i + 1) { "" }
                     val candidates = fetchAssets(assetProviders, "transition", "", 10)
@@ -603,25 +763,26 @@ class PipelineOrchestrator @Inject constructor(
             }
         } else emptyList()
 
-        // 2. التراكبات النصية
+        // 2. التراكبات (مؤثرات بصرية)
         val overlays = mutableListOf<MontagePlan.MontageOverlay>()
         if (useVisualFx) {
-            overlays.add(
-                MontagePlan.MontageOverlay(
-                    type = "text",
-                    content = config.prompt.take(50),
-                    startMs = 0,
-                    durationMs = totalDurationMs,
-                    position = "bottom_center",
-                    fontSize = 24,
-                    fontColor = "white"
+            for (i in 0 until minOf(smartCount.visualFxCount, sceneDescriptions.size)) {
+                overlays.add(
+                    MontagePlan.MontageOverlay(
+                        type = "text",
+                        content = "تأثير بصري للمشهد ${i+1}",
+                        startMs = i * perSceneDurationMs,
+                        durationMs = perSceneDurationMs,
+                        position = "center",
+                        fontSize = 20,
+                        fontColor = "white"
+                    )
                 )
-            )
+            }
         }
 
         // 3. المسارات الصوتية
         val audioTracks = mutableListOf<MontagePlan.MontageAudio>()
-
         val mainAudioFile = File(audiosDir, "SCRIPTS_SSML_AU.wav")
         if (mainAudioFile.exists()) {
             audioTracks.add(
@@ -641,8 +802,8 @@ class PipelineOrchestrator @Inject constructor(
             val musicCandidates = fetchAssets(assetProviders, "music", overallTheme, 5)
             if (musicCandidates.isNotEmpty()) {
                 val suggestedMusic = agentOrchestrator.suggestMusic(overallTheme, sceneDescriptions, musicCandidates)
-                if (suggestedMusic != null && suggestedMusic.fileUrl != null) {
-                    val localPath = downloadAssetIfNeeded(suggestedMusic)
+                if (suggestedMusic != null) {
+                    val localPath = suggestedMusic.localPath ?: downloadAssetIfNeeded(suggestedMusic)
                     if (localPath != null) {
                         audioTracks.add(
                             MontagePlan.MontageAudio(
@@ -654,25 +815,19 @@ class PipelineOrchestrator @Inject constructor(
                                 fadeOutMs = 3000
                             )
                         )
-                        emitLog("الوكيل: تم اختيار الموسيقى الخلفية '${suggestedMusic.name}' من مصدر خارجي")
+                        emitLog("الوكيل: تم اختيار الموسيقى الخلفية '${suggestedMusic.name}'")
                     }
                 }
-            } else {
-                emitLog("لا توجد موسيقى متاحة من الـ APIs")
             }
-        }
 
-        if (useAudioFx) {
-            for (i in sceneDescriptions.indices) {
+            for (i in 0 until minOf(smartCount.audioFxCount, sceneDescriptions.size)) {
                 val sceneDesc = sceneDescriptions[i]
                 val sfxCandidates = fetchAssets(assetProviders, "sfx", sceneDesc, 3)
                 val suggestedSfx = if (sfxCandidates.isNotEmpty()) {
                     agentOrchestrator.suggestSoundEffects(sceneDesc, sfxCandidates)
-                } else {
-                    emptyList()
-                }
+                } else emptyList()
                 suggestedSfx.forEach { sfx ->
-                    val localPath = downloadAssetIfNeeded(sfx)
+                    val localPath = sfx.localPath ?: downloadAssetIfNeeded(sfx)
                     if (localPath != null) {
                         audioTracks.add(
                             MontagePlan.MontageAudio(
@@ -684,19 +839,19 @@ class PipelineOrchestrator @Inject constructor(
                                 fadeOutMs = 500
                             )
                         )
-                        emitLog("الوكيل: تم إضافة مؤثر صوتي '${sfx.name}' للمشهد ${i+1} من مصدر خارجي")
+                        emitLog("الوكيل: تم إضافة مؤثر صوتي '${sfx.name}' للمشهد ${i+1}")
                     }
                 }
             }
         }
 
-        // 4. عناصر خارجية (فيديوهات، صور) – جلب من APIs
+        // 4. عناصر خارجية (فيديوهات، صور)
         if (useExternalVideo) {
             val videoQuery = config.prompt.take(50)
             val videoAssets = fetchAssets(assetProviders, "video", videoQuery, 2)
             if (videoAssets.isNotEmpty()) {
                 val firstVideo = videoAssets.first()
-                val localPath = downloadAssetIfNeeded(firstVideo)
+                val localPath = firstVideo.localPath ?: downloadAssetIfNeeded(firstVideo)
                 if (localPath != null) {
                     inputs.add(
                         MontagePlan.MontageInput(
@@ -705,10 +860,8 @@ class PipelineOrchestrator @Inject constructor(
                             durationMs = perSceneDurationMs
                         )
                     )
-                    emitLog("تم إضافة فيديو خارجي '${firstVideo.name}' من المصدر")
+                    emitLog("تم إضافة فيديو خارجي '${firstVideo.name}'")
                 }
-            } else {
-                emitLog("لم يتم العثور على فيديوهات خارجية مناسبة")
             }
         }
 
@@ -717,7 +870,7 @@ class PipelineOrchestrator @Inject constructor(
             val imageAssets = fetchAssets(assetProviders, "image", imageQuery, 2)
             if (imageAssets.isNotEmpty()) {
                 val firstImage = imageAssets.first()
-                val localPath = downloadAssetIfNeeded(firstImage)
+                val localPath = firstImage.localPath ?: downloadAssetIfNeeded(firstImage)
                 if (localPath != null) {
                     overlays.add(
                         MontagePlan.MontageOverlay(
@@ -732,13 +885,10 @@ class PipelineOrchestrator @Inject constructor(
                     )
                     emitLog("تم إضافة صورة خارجية '${firstImage.name}' كتراكب")
                 }
-            } else {
-                emitLog("لم يتم العثور على صور خارجية مناسبة")
             }
         }
 
-        val targetSize = computeTargetSize(config.aspect, config.quality)
-        val subtitleStyle = getSubtitleStyle(scriptsDir, config)
+        val subtitleStyle = if (plan.enableSubtitles) getSubtitleStyle(scriptsDir, config) else null
 
         return MontagePlan(
             inputFiles = inputs,
@@ -927,18 +1077,6 @@ class PipelineOrchestrator @Inject constructor(
     private fun patchPromptForModel(modelId: String, prompt: String): String = if (modelId.contains("openjourney", ignoreCase = true)) "mdjrny-v4 style, $prompt" else prompt
     private fun stripSsml(ssml: String): String = ssml.replace(Regex("<[^>]+>"), " ").trim()
     private fun readFileB64(path: String): String = try { android.util.Base64.encodeToString(File(path).readBytes(), android.util.Base64.NO_WRAP) } catch (_: Exception) { "" }
-    private fun resizeImageBytes(data: ByteArray, targetW: Int, targetH: Int): ByteArray {
-        return try {
-            val bmp = BitmapFactory.decodeByteArray(data, 0, data.size)
-            val scaled = Bitmap.createScaledBitmap(bmp, targetW, targetH, true)
-            val bos = java.io.ByteArrayOutputStream()
-            scaled.compress(Bitmap.CompressFormat.PNG, 100, bos)
-            val result = bos.toByteArray()
-            bos.close(); scaled.recycle(); bmp.recycle()
-            result
-        } catch (_: Exception) { data }
-    }
-
     private fun createPlaceholderVideo(file: File, durationMs: Int) {
         try {
             file.parentFile?.mkdirs()
