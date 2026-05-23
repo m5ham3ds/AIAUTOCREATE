@@ -6,8 +6,13 @@ import android.media.MediaMetadataRetriever
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.Asset
+// ✅ استيراد جميع مزودي الأصول من المسار الصحيح com.aiautocreate.asset
+import com.aiautocreate.asset.PexelsAssetProvider
+import com.aiautocreate.asset.PixabayAssetProvider
+import com.aiautocreate.asset.LotsOfSoundsAssetProvider
+import com.aiautocreate.asset.FreesoundAssetProvider
+import com.aiautocreate.asset.OpenVFXAssetProvider
 import com.aiautocreate.asset.LocalAssetProvider
-import com.aiautocreate.asset.*
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
@@ -99,18 +104,18 @@ class PipelineOrchestrator @Inject constructor(
     private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
     private val freesoundProvider: FreesoundAssetProvider,
     private val openVfxProvider: OpenVFXAssetProvider,
-    private val localAssetProvider: LocalAssetProvider?, // ✅ اختياري
+    private val localAssetProvider: LocalAssetProvider, // ليس اختيارياً، لأنه موجود في المسار الصحيح
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
-    private val assetProviders: Set<AssetProvider> = buildSet {
-        add(pexelsProvider)
-        add(pixabayProvider)
-        add(lotsOfSoundsProvider)
-        add(freesoundProvider)
-        add(openVfxProvider)
-        localAssetProvider?.let { add(it) }
-    }
+    private val assetProviders: Set<AssetProvider> = setOf(
+        localAssetProvider,
+        pexelsProvider,
+        pixabayProvider,
+        lotsOfSoundsProvider,
+        freesoundProvider,
+        openVfxProvider
+    )
 
     private val _events = MutableSharedFlow<PipelineEvent>()
     val events: SharedFlow<PipelineEvent> = _events
@@ -128,7 +133,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 1. دالة التشغيل الرئيسية (معدلة)
+    // 1. دالة التشغيل الرئيسية
     // ----------------------------------------------
     suspend fun execute(config: PipelineConfig) {
         cancelled = false
@@ -143,7 +148,6 @@ class PipelineOrchestrator @Inject constructor(
         val audiosDir = ensureDir("$projectTempDir/AUDIOS")
         val videosDir = ensureDir("$projectTempDir/VIDEOS")
 
-        // ✅ حساب الأبعاد الهدف والمدة من إعدادات FFmpeg
         val targetSize = computeTargetSize(config.aspect, config.quality)
         val totalDurationSec = (config.minutes.toIntOrNull() ?: 1) * 60 + (config.seconds.toIntOrNull() ?: 30)
 
@@ -153,25 +157,21 @@ class PipelineOrchestrator @Inject constructor(
             emitLog("⏱️ المدة المطلوبة: ${totalDurationSec / 60} دقيقة و ${totalDurationSec % 60} ثانية")
             emitProgress("orchestrator", "تنسيق الخطة...", 1)
 
-            // ✅ 1. المنسق الرئيسي (Orchestrator)
             val orchestrationPlan = orchestratePlan(config)
 
             emitProgress("script", "توليد السيناريو...", 5)
-            // ✅ 2. توليد السيناريو مع المدة والأبعاد
             val scriptText = generateScript(config, totalDurationSec, targetSize)
             emitProgress("script", "تم إنشاء السيناريو", 15)
 
             if (checkCancel()) return
             saveScriptAndExtract(scriptText, scriptsDir)
 
-            // ✅ 3. العدد الذكي (Smart Count)
             val audioFile = File(audiosDir, "SCRIPTS_SSML_AU.wav")
             val actualAudioDurationMs = if (audioFile.exists()) getAudioDuration(audioFile) else 0L
             val smartCount = if (orchestrationPlan.enableSmartCount) {
                 smartCountAnalysis(config, scriptText, actualAudioDurationMs)
             } else SmartCountResult(3, 2, 2)
 
-            // ✅ 4. المهام الفرعية
             if (!hfQuotaExceeded) processImages(config, imagesDir, scriptsDir, smartCount.visualFxCount, targetSize)
             if (!hfQuotaExceeded) processTts(config, audiosDir, scriptsDir)
             if (!hfQuotaExceeded) processVideo(config, videosDir, imagesDir, scriptsDir, smartCount.transitionsCount)
@@ -183,7 +183,6 @@ class PipelineOrchestrator @Inject constructor(
             )
             emitProgress("video", "اكتمل الفيديو", 100)
 
-            // ✅ 5. المراجع (Reviewer)
             if (orchestrationPlan.enableReviewer) {
                 val review = reviewFinalVideo(outputFile, config)
                 if (review != null) emitLog("📝 مراجعة الوكيل: $review")
