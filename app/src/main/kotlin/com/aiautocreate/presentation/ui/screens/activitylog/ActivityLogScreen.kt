@@ -3,9 +3,12 @@ package com.aiautocreate.presentation.ui.screens.activitylog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +31,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActivityLogScreen(
     onMenuClick: () -> Unit,
@@ -44,61 +48,109 @@ fun ActivityLogScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(BackgroundMain)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            // مسافة علوية بسيطة للتباعد عن الهيدر
-            Spacer(modifier = Modifier.height(Spacing.md))
-
-            // بطاقة الفلترة
-            FilterChipsRow(state, viewModel)
-
-            Spacer(modifier = Modifier.height(Spacing.md))
-
-            // عرض السجلات
-            if (state.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(AppSpecific.emptyStateHeight)
-                        .padding(horizontal = Spacing.lg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Primary)
-                }
-            } else if (state.filteredLogs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(AppSpecific.emptyStateHeight)
-                        .padding(horizontal = Spacing.lg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "لا توجد سجلات",
-                        color = TextHint,
-                        fontSize = AppFontSize.bodyMedium
-                    )
-                }
-            } else {
-                state.filteredLogs.forEach { log ->
-                    when {
-                        log.type == "error" || !log.isSuccess -> LogErrorCard(log)
-                        log.type == "api_warning" -> LogWarningCard(log)
-                        else -> LogInfoCard(log)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("سجل النشاطات") },
+                navigationIcon = {
+                    IconButton(onClick = onMenuClick) {
+                        Icon(painterResource(R.drawable.ic_menu), contentDescription = "Menu")
                     }
-                    Spacer(modifier = Modifier.height(Spacing.md))
+                },
+                actions = {
+                    // زر التحديث اليدوي
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        if (state.isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(IconSize.md),
+                                color = PrimaryLight,
+                                strokeWidth = Border.thick
+                            )
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundMain,
+                    titleContentColor = TextPrimary,
+                    navigationIconContentColor = TextPrimary,
+                    actionIconContentColor = TextPrimary
+                )
+            )
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(BackgroundMain)
+                .padding(innerPadding)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // شريط البحث
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = { viewModel.updateSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    placeholder = { Text("بحث في السجلات...", color = TextHint) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryLight,
+                        unfocusedBorderColor = BorderInput,
+                        cursorColor = PrimaryLight
+                    ),
+                    shape = RoundedCornerShape(Radius.xxl),
+                    singleLine = true
+                )
+
+                // فلترة
+                FilterChipsRow(state, viewModel)
+
+                Spacer(modifier = Modifier.height(Spacing.md))
+
+                // عرض السجلات
+                if (state.isLoading && !state.isRefreshing) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(AppSpecific.emptyStateHeight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Primary)
+                    }
+                } else if (state.filteredLogs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(AppSpecific.emptyStateHeight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "لا توجد سجلات تطابق المعايير",
+                            color = TextHint,
+                            fontSize = AppFontSize.bodyMedium
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                        contentPadding = PaddingValues(vertical = Spacing.md, horizontal = Spacing.lg)
+                    ) {
+                        items(state.filteredLogs) { log ->
+                            when {
+                                log.type == "error" || !log.isSuccess -> LogErrorCard(log)
+                                log.type == "api_warning" -> LogWarningCard(log)
+                                else -> LogInfoCard(log)
+                            }
+                        }
+                    }
                 }
             }
-
-            // ✅ تم إزالة Spacer السفلي الثابت (يتم ضبطه عبر Scaffold في MainActivity)
         }
     }
 }
@@ -116,7 +168,7 @@ private fun FilterChipsRow(state: ActivityLogState, viewModel: ActivityLogViewMo
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm) // ✅ إضافة مسافة بين الشرائح
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             FilterChip(
                 selected = state.selectedFilter == "all",
@@ -183,15 +235,12 @@ private fun LogInfoCard(log: ActivityLog) {
             .format(instant)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg)
-            .clip(RoundedCornerShape(Radius.xxl))
-            .background(CardPrimary)
-            .padding(Spacing.md) // ✅ تقليل padding الداخلي من Spacing.lg إلى md
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardPrimary),
+        shape = RoundedCornerShape(Radius.xxl)
     ) {
-        Column {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -218,18 +267,18 @@ private fun LogInfoCard(log: ActivityLog) {
                 Spacer(Modifier.weight(1f))
                 Box(
                     Modifier
-                        .size(Spacing.sm) // ✅ تصغير الحجم من md إلى sm
+                        .size(Spacing.sm)
                         .clip(RoundedCornerShape(Radius.round))
                         .background(AccentBlue)
                 )
             }
-            Spacer(Modifier.height(Spacing.md)) // ✅ تقليل المسافة من lg إلى md
+            Spacer(Modifier.height(Spacing.md))
             Text(
                 text = log.title,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 color = TextPrimary,
-                fontSize = AppFontSize.titleSmall, // ✅ تصغير حجم الخط من titleMedium إلى titleSmall
+                fontSize = AppFontSize.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             if (log.description.isNotBlank()) {
@@ -239,7 +288,7 @@ private fun LogInfoCard(log: ActivityLog) {
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     color = TextBody,
-                    fontSize = AppFontSize.bodySmall // ✅ تصغير حجم الخط من bodyMedium إلى bodySmall
+                    fontSize = AppFontSize.bodySmall
                 )
             }
         }
@@ -255,15 +304,12 @@ private fun LogWarningCard(log: ActivityLog) {
             .format(instant)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg)
-            .clip(RoundedCornerShape(Radius.xxl))
-            .background(CardPrimary)
-            .padding(Spacing.md) // ✅ تقليل padding الداخلي
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardPrimary),
+        shape = RoundedCornerShape(Radius.xxl)
     ) {
-        Column {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -290,7 +336,7 @@ private fun LogWarningCard(log: ActivityLog) {
                 Spacer(Modifier.weight(1f))
                 Box(
                     Modifier
-                        .size(Spacing.sm) // ✅ تصغير الحجم
+                        .size(Spacing.sm)
                         .clip(RoundedCornerShape(Radius.round))
                         .background(Color(0xFFF8A8C5))
                 )
@@ -327,34 +373,36 @@ private fun LogErrorCard(log: ActivityLog) {
             .withZone(ZoneId.systemDefault())
             .format(instant)
     }
+    val hasDetails = log.description.isNotBlank()
 
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg)
-            .clip(RoundedCornerShape(Radius.xxl))
-            .background(CardPrimary)
-            .clickable { expanded = !expanded }
+            .clickable { if (hasDetails) expanded = !expanded },
+        colors = CardDefaults.cardColors(containerColor = CardPrimary),
+        shape = RoundedCornerShape(Radius.xxl)
     ) {
-        Column {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.md), // ✅ تقليل padding من lg إلى md
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(
-                        id = if (expanded) R.drawable.ic_keyboard_arrow_up
-                        else R.drawable.ic_keyboard_arrow_down
-                    ),
-                    contentDescription = "Expand",
-                    modifier = Modifier.size(IconSize.sm), // ✅ تصغير حجم الأيقونة
-                    tint = TextHint
-                )
+                if (hasDetails) {
+                    Icon(
+                        painter = painterResource(
+                            id = if (expanded) R.drawable.ic_keyboard_arrow_up
+                            else R.drawable.ic_keyboard_arrow_down
+                        ),
+                        contentDescription = "Expand",
+                        modifier = Modifier.size(IconSize.sm),
+                        tint = TextHint
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(IconSize.sm))
+                }
                 Box(
                     modifier = Modifier
-                        .padding(start = Spacing.md)
+                        .padding(start = if (hasDetails) Spacing.md else Spacing.xs)
                         .clip(RoundedCornerShape(Radius.sm))
                         .background(CardSoft)
                         .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
@@ -372,54 +420,58 @@ private fun LogErrorCard(log: ActivityLog) {
                     color = TextHint,
                     fontSize = AppFontSize.bodySmall
                 )
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
                 Box(
                     modifier = Modifier
                         .size(Spacing.sm)
                         .clip(RoundedCornerShape(Radius.round))
-                        .background(Color(0xFFFFD6D6))
+                        .background(ErrorRed)
                 )
             }
+            Spacer(Modifier.height(Spacing.sm))
             Text(
                 text = log.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg),
+                modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 color = TextPrimary,
                 fontSize = AppFontSize.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             if (log.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(Spacing.sm))
                 Text(
-                    text = log.description,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
+                    text = log.description.take(150),
+                    modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     color = TextBody,
                     fontSize = AppFontSize.bodySmall
                 )
             }
             if (expanded && log.description.isNotBlank()) {
+                Spacer(Modifier.height(Spacing.md))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = Spacing.md) // ✅ تقليل من lg إلى md
-                        .clip(RoundedCornerShape(bottomStart = Radius.xxl, bottomEnd = Radius.xxl))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(CardSoft)
-                        .padding(Spacing.md),
-                    contentAlignment = Alignment.Center
+                        .padding(Spacing.md)
                 ) {
-                    Text(
-                        text = log.description,
-                        modifier = Modifier.fillMaxWidth(),
-                        fontFamily = FontFamily.Monospace,
-                        lineHeight = AppFontSize.titleMedium.value.sp, // ✅ تقليل lineHeight
-                        color = TextPrimary,
-                        fontSize = AppFontSize.bodySmall
-                    )
+                    Column {
+                        Text(
+                            text = "التفاصيل الكاملة:",
+                            color = TextPrimary,
+                            fontSize = AppFontSize.caption,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            text = log.description,
+                            modifier = Modifier.fillMaxWidth(),
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = AppFontSize.bodyLarge.value.sp,
+                            color = TextPrimary,
+                            fontSize = AppFontSize.bodySmall
+                        )
+                    }
                 }
             }
         }
