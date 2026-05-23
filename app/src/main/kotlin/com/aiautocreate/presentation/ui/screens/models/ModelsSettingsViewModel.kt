@@ -3,7 +3,6 @@ package com.aiautocreate.presentation.ui.screens.models
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.aiautocreate.agent.GeminiKeyManager
 import com.aiautocreate.agent.HuggingFaceTokenManager
@@ -16,7 +15,6 @@ import com.aiautocreate.worker.BackgroundStyleRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 @HiltViewModel
@@ -109,7 +107,6 @@ class ModelsSettingsViewModel @Inject constructor(
         }
     }
 
-    // ✅ التصحيح الجوهري: تصفية النماذج حسب الفئة المخزنة في model.category (CSV)
     private fun loadModelsByCategory() {
         viewModelScope.launch {
             modelsRepo.getAllModelConfigs()
@@ -216,7 +213,10 @@ class ModelsSettingsViewModel @Inject constructor(
         }
     }
 
-    // ✅ تحسين عملية تحديث القوائم: زيادة وقت الانتظار وتحميل النماذج بعدها
+    /**
+     * تحديث القوائم في الخلفية باستخدام WorkManager ومراقبة النتيجة عبر Flow.
+     * يتم عرض عدد العناصر المحدثة عند الانتهاء.
+     */
     fun refreshModelsInBackground() {
         viewModelScope.launch {
             if (!NetworkUtils.isOnline(application)) {
@@ -224,18 +224,49 @@ class ModelsSettingsViewModel @Inject constructor(
                 return@launch
             }
 
-            _state.update { it.copy(isRefreshing = true, errorMessage = null, saveSuccessMessage = null) }
-            _state.update { it.copy(saveSuccessMessage = "🔄 جاري تحديث القوائم... قد يستغرق بضع ثوانٍ.") }
+            _state.update {
+                it.copy(
+                    isRefreshing = true,
+                    errorMessage = null,
+                    saveSuccessMessage = "🔄 جاري تحديث القوائم... قد يستغرق بضع ثوانٍ."
+                )
+            }
 
             try {
-                val workRequest = OneTimeWorkRequestBuilder<BackgroundStyleRefresher>().build()
+                // استخدام دالة إنشاء العمل المحسّنة من BackgroundStyleRefresher
+                val workRequest = BackgroundStyleRefresher.createWorkRequest()
                 WorkManager.getInstance(application).enqueue(workRequest)
-                // ✅ زيادة المدة للتأكد من اكتمال العمل
-                delay(5000)
-                loadModelsByCategory()
-                _state.update { it.copy(isRefreshing = false, saveSuccessMessage = "✅ تم تحديث القوائم بنجاح!") }
+
+                // مراقبة حالة العمل حتى اكتماله
+                WorkManager.getInstance(application)
+                    .getWorkInfoByIdFlow(workRequest.id)
+                    .filter { it.state.isFinished }
+                    .first()
+                    .let { workInfo ->
+                        val updatedCount = workInfo.outputData.getInt(
+                            BackgroundStyleRefresher.KEY_UPDATED_MODELS_COUNT,
+                            0
+                        )
+                        // إعادة تحميل النماذج في الـ UI بعد الانتهاء
+                        loadModelsByCategory()
+                        _state.update {
+                            it.copy(
+                                isRefreshing = false,
+                                saveSuccessMessage = if (updatedCount > 0) {
+                                    "✅ تم تحديث القوائم بنجاح! (تم تحديث $updatedCount عنصر)"
+                                } else {
+                                    "✅ تم تحديث القوائم بنجاح! (لم يتم العثور على عناصر جديدة)"
+                                }
+                            )
+                        }
+                    }
             } catch (e: Exception) {
-                _state.update { it.copy(isRefreshing = false, errorMessage = "❌ فشل تحديث القوائم: ${e.message}") }
+                _state.update {
+                    it.copy(
+                        isRefreshing = false,
+                        errorMessage = "❌ فشل تحديث القوائم: ${e.message}"
+                    )
+                }
             }
         }
     }
