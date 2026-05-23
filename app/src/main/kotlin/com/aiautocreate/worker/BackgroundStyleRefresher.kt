@@ -9,6 +9,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.delay
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
 
 /**
  * عامل خلفية لتحديث قوائم الأنماط والنماذج من HuggingFace و GitHub.
@@ -35,6 +36,7 @@ class BackgroundStyleRefresher @AssistedInject constructor(
         
         /**
          * إنشاء طلب عمل مع قيود الشبكة واستراتيجية إعادة المحاولة
+         * باستخدام TimeUnit للتوافق مع جميع إصدارات أندرويد
          */
         fun createWorkRequest(): OneTimeWorkRequest {
             return OneTimeWorkRequestBuilder<BackgroundStyleRefresher>()
@@ -45,7 +47,8 @@ class BackgroundStyleRefresher @AssistedInject constructor(
                 )
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    Duration.ofSeconds(10)
+                    10, // 10 ثوانٍ
+                    TimeUnit.SECONDS
                 )
                 .addTag("refresh_models")
                 .build()
