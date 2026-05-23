@@ -571,4 +571,3 @@ private fun AgentSettingsSection(state: ModelsSettingsState, viewModel: ModelsSe
             )
         }
     }
-}
