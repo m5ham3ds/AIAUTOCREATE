@@ -6,13 +6,8 @@ import android.media.MediaMetadataRetriever
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.Asset
-// ✅ تصحيح المسار: جميع المزودين من com.aiautocreate.asset
-import com.aiautocreate.asset.PexelsAssetProvider
-import com.aiautocreate.asset.PixabayAssetProvider
-import com.aiautocreate.asset.LotsOfSoundsAssetProvider
-import com.aiautocreate.asset.FreesoundAssetProvider
-import com.aiautocreate.asset.OpenVFXAssetProvider
-import com.aiautocreate.asset.LocalAssetProvider
+// جميع مزودي الأصول في حزمة واحدة
+import com.aiautocreate.data.asset.*
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
