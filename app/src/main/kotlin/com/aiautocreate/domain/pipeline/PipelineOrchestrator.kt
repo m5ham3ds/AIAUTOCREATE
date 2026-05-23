@@ -1095,47 +1095,18 @@ class PipelineOrchestrator @Inject constructor(
         _events.emit(PipelineEvent.Progress(stage, msg, percent))
         _events.emit(PipelineEvent.Log("[$stage] $msg"))
     }
-    private suspend fun emitLog(msg: String) = _events.emit(PipelineEvent.Log(msg))
-    private suspend fun emitError(stage: String, msg: String) = _events.emit(PipelineEvent.Error(stage, msg))
-    private suspend fun emitFinalResult(path: String) = _events.emit(PipelineEvent.FinalResult(path))
-}
 
-// داخل PipelineOrchestrator (حقن ActivityLogRepository)
-private suspend fun emitLog(msg: String) {
-    _events.emit(PipelineEvent.Log(msg))
-    // تسجيل في سجل النشاطات
-    activityLogRepo.insertLog(
-        ActivityLog(
-            type = "info",
-            title = "تقدم العملية",
-            description = msg,
-            isSuccess = true
-        )
-    )
-}
+    private suspend fun emitLog(msg: String) {
+        _events.emit(PipelineEvent.Log(msg))
+    }
 
-private suspend fun emitError(stage: String, msg: String) {
-    _events.emit(PipelineEvent.Error(stage, msg))
-    activityLogRepo.insertLog(
-        ActivityLog(
-            type = "error",
-            title = "خطأ في المرحلة: $stage",
-            description = msg,
-            isSuccess = false
-        )
-    )
-}
+    private suspend fun emitError(stage: String, msg: String) {
+        _events.emit(PipelineEvent.Error(stage, msg))
+    }
 
-private suspend fun emitFinalResult(path: String) {
-    _events.emit(PipelineEvent.FinalResult(path))
-    activityLogRepo.insertLog(
-        ActivityLog(
-            type = "info",
-            title = "اكتملت العملية",
-            description = "تم إنشاء الفيديو: $path",
-            isSuccess = true
-        )
-    )
+    private suspend fun emitFinalResult(path: String) {
+        _events.emit(PipelineEvent.FinalResult(path))
+    }
 }
 
 private suspend fun AppSettingsRepository.getBoolFlag(key: String, default: Boolean): Boolean {
