@@ -10,7 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -36,7 +35,6 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // ✅ عرض رسائل الخطأ عبر Snackbar
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -44,7 +42,6 @@ fun HomeScreen(
         }
     }
 
-    // ✅ إعادة تحميل القوائم في كل مرة تظهر فيها الشاشة (بعد تغيير الإعدادات)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -55,11 +52,7 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(BackgroundMain)
-    ) {
+    Box(modifier = modifier.fillMaxSize().background(BackgroundMain)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,7 +72,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // بطاقة إعدادات الإنشاء
             AppCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,7 +127,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // منطقة السجلات
             AppCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,7 +149,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // معاينة الفيديو
             if (state.outputVideoPath != null) {
                 Box(
                     modifier = Modifier
@@ -200,7 +190,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // شريط المعالجة
             if (state.isProcessing || state.progress > 0f) {
                 AppProgressSection(
                     progress = state.progress,
@@ -243,7 +232,6 @@ fun HomeScreen(
                     maxLines = 3
                 )
                 Spacer(modifier = Modifier.width(Spacing.md))
-                // ✅ زر الإرسال يتحول إلى زر إلغاء أثناء المعالجة
                 IconButton(
                     onClick = {
                         if (state.isProcessing) {
@@ -252,7 +240,7 @@ fun HomeScreen(
                             viewModel.startProcessing()
                         }
                     },
-                    enabled = !state.isProcessing || true, // زر الإلغاء مفعل دائماً
+                    enabled = true,
                     modifier = Modifier
                         .size(ComponentSize.fabSize)
                         .clip(RoundedCornerShape(Radius.round))
@@ -266,27 +254,19 @@ fun HomeScreen(
                             tint = TextPrimary
                         )
                     } else {
-                        if (state.isProcessing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(IconSize.md),
-                                color = TextPrimary,
-                                strokeWidth = Border.thick
-                            )
-                        } else {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_send),
-                                contentDescription = "إرسال",
-                                modifier = Modifier.size(IconSize.md),
-                                tint = TextPrimary
-                            )
-                        }
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_send),
+                            contentDescription = "إرسال",
+                            modifier = Modifier.size(IconSize.md),
+                            tint = TextPrimary
+                        )
                     }
                 }
             }
         }
     }
 
-    // ✅ حوار تأكيد إلغاء العملية
+    // حوار تأكيد الإلغاء
     if (state.showCancelDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.hideCancelDialog() },
@@ -311,13 +291,15 @@ fun HomeScreen(
         )
     }
 
-    // ✅ SnackbarHost - تمت إزالة معامل snackbarHost غير الصحيح
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(Spacing.lg)
-    )
+    // SnackbarHost - تم إصلاح الوضع
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg)
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
