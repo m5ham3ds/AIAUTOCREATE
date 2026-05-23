@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
+import androidx.lifecycle.Observer
 import com.aiautocreate.agent.GeminiKeyManager
 import com.aiautocreate.agent.HuggingFaceTokenManager
 import com.aiautocreate.data.repository.AppSettingsRepository
@@ -15,6 +16,8 @@ import com.aiautocreate.worker.BackgroundStyleRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
@@ -218,58 +221,43 @@ class ModelsSettingsViewModel @Inject constructor(
      * يتم عرض عدد العناصر المحدثة عند الانتهاء.
      */
     fun refreshModelsInBackground() {
-        viewModelScope.launch {
-            if (!NetworkUtils.isOnline(application)) {
-                _state.update { it.copy(errorMessage = "📡 لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.") }
-                return@launch
-            }
+    viewModelScope.launch {
+        if (!NetworkUtils.isOnline(application)) {
+            _state.update { it.copy(errorMessage = "📡 لا يوجد اتصال بالإنترنت") }
+            return@launch
+        }
 
+        _state.update {
+            it.copy(isRefreshing = true, errorMessage = null, saveSuccessMessage = "🔄 جاري تحديث القوائم...")
+        }
+
+        try {
+            val workRequest = BackgroundStyleRefresher.createWorkRequest()
+            WorkManager.getInstance(application).enqueue(workRequest)
+
+            // ✅ الحل المثالي: استخدام Flow مع جمع آمن للنتيجة
+            var updatedCount = 0
+            WorkManager.getInstance(application)
+                .getWorkInfoByIdFlow(workRequest.id)
+                .filter { workInfo -> workInfo != null && workInfo.state.isFinished }
+                .firstOrNull()
+                ?.let { workInfo ->
+                    updatedCount = workInfo.outputData.getInt(BackgroundStyleRefresher.KEY_UPDATED_MODELS_COUNT, 0)
+                }
+
+            loadModelsByCategory()
             _state.update {
                 it.copy(
-                    isRefreshing = true,
-                    errorMessage = null,
-                    saveSuccessMessage = "🔄 جاري تحديث القوائم... قد يستغرق بضع ثوانٍ."
+                    isRefreshing = false,
+                    saveSuccessMessage = if (updatedCount > 0) "✅ تم تحديث $updatedCount عنصر"
+                    else "✅ تم التحديث (لا توجد عناصر جديدة)"
                 )
             }
-
-            try {
-                val workRequest = BackgroundStyleRefresher.createWorkRequest()
-                WorkManager.getInstance(application).enqueue(workRequest)
-
-                // مراقبة حالة العمل حتى اكتماله
-                WorkManager.getInstance(application)
-                    .getWorkInfoByIdFlow(workRequest.id)
-                    .filter { it.state.isFinished }
-                    .first()
-                    .let { workInfo ->
-                        // ✅ استخدام ?. لتجنب NullPointerException
-                        val updatedCount = workInfo?.outputData?.getInt(
-                            BackgroundStyleRefresher.KEY_UPDATED_MODELS_COUNT,
-                            0
-                        ) ?: 0
-                        // إعادة تحميل النماذج في الـ UI بعد الانتهاء
-                        loadModelsByCategory()
-                        _state.update {
-                            it.copy(
-                                isRefreshing = false,
-                                saveSuccessMessage = if (updatedCount > 0) {
-                                    "✅ تم تحديث القوائم بنجاح! (تم تحديث $updatedCount عنصر)"
-                                } else {
-                                    "✅ تم تحديث القوائم بنجاح! (لم يتم العثور على عناصر جديدة)"
-                                }
-                            )
-                        }
-                    }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        isRefreshing = false,
-                        errorMessage = "❌ فشل تحديث القوائم: ${e.message}"
-                    )
-                }
-            }
+        } catch (e: Exception) {
+            _state.update { it.copy(isRefreshing = false, errorMessage = "❌ فشل التحديث: ${e.message}") }
         }
     }
+}
 
     fun clearMessages() {
         _state.update { it.copy(saveSuccessMessage = null, errorMessage = null) }
