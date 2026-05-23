@@ -311,20 +311,12 @@ fun HomeScreen(
         )
     }
 
-    // ✅ Snackbar لعرض الأخطاء
+    // ✅ SnackbarHost - تمت إزالة معامل snackbarHost غير الصحيح
     SnackbarHost(
         hostState = snackbarHostState,
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(Spacing.lg),
-        snackbarHost = { data ->
-            Snackbar(
-                snackbarData = data,
-                containerColor = CardDark,
-                contentColor = ErrorRed,
-                actionColor = PrimaryLight
-            )
-        }
+            .padding(Spacing.lg)
     )
 }
 
