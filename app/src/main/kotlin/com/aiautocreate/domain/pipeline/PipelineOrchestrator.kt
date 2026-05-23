@@ -6,13 +6,13 @@ import android.media.MediaMetadataRetriever
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.Asset
-// ✅ استيراد جميع مزودي الأصول من المسار الصحيح com.aiautocreate.asset
-import com.aiautocreate.asset.PexelsAssetProvider
-import com.aiautocreate.asset.PixabayAssetProvider
-import com.aiautocreate.asset.LotsOfSoundsAssetProvider
-import com.aiautocreate.asset.FreesoundAssetProvider
-import com.aiautocreate.asset.OpenVFXAssetProvider
-import com.aiautocreate.asset.LocalAssetProvider
+// ✅ تصحيح المسار: com.aiautocreate.data.asset بدلاً من com.aiautocreate.asset
+import com.aiautocreate.data.asset.PexelsAssetProvider
+import com.aiautocreate.data.asset.PixabayAssetProvider
+import com.aiautocreate.data.asset.LotsOfSoundsAssetProvider
+import com.aiautocreate.data.asset.FreesoundAssetProvider
+import com.aiautocreate.data.asset.OpenVFXAssetProvider
+import com.aiautocreate.data.asset.LocalAssetProvider
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.request.*
@@ -104,7 +104,7 @@ class PipelineOrchestrator @Inject constructor(
     private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
     private val freesoundProvider: FreesoundAssetProvider,
     private val openVfxProvider: OpenVFXAssetProvider,
-    private val localAssetProvider: LocalAssetProvider, // ليس اختيارياً، لأنه موجود في المسار الصحيح
+    private val localAssetProvider: LocalAssetProvider,
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
