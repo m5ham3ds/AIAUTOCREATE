@@ -10,7 +10,7 @@ import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.domain.usecase.model.CheckApiModelsUseCase
 import com.aiautocreate.domain.usecase.model.ManageModelsUseCase
-import com.aiautocreate.utils.NetworkUtils           // ✅ استيراد أداة الشبكة
+import com.aiautocreate.util.NetworkUtils           // ✅ استيراد أداة الشبكة
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
