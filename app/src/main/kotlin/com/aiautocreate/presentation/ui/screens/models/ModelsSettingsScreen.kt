@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,11 +47,7 @@ fun ModelsSettingsScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(BackgroundMain)
-    ) {
+    Box(modifier = modifier.fillMaxSize().background(BackgroundMain)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -71,9 +66,7 @@ fun ModelsSettingsScreen(
                 Spacer(modifier = Modifier.height(Spacing.md))
             }
 
-            // ✅ قسم إعدادات الوكيل (تم إصلاح هيكله)
             AgentSettingsSection(state, viewModel)
-
             Spacer(modifier = Modifier.height(Spacing.md))
 
             Button(
@@ -103,13 +96,16 @@ fun ModelsSettingsScreen(
         }
     }
 
-// SnackbarHost - تمت إزالة snackbarHost
-SnackbarHost(
-    hostState = snackbarHostState,
-    modifier = Modifier
-        .align(Alignment.BottomCenter)
-        .padding(Spacing.lg)
-)
+    // ✅ SnackbarHost خارج الـ Box الرئيسي وبوضعية صحيحة
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg)
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -569,7 +565,6 @@ private fun AgentSettingsSection(state: ModelsSettingsState, viewModel: ModelsSe
                     cursorColor = PrimaryLight
                 )
             )
-      }
+        }
     }
-  }
 }
