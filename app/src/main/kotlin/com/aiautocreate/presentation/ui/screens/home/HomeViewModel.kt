@@ -11,9 +11,9 @@ import com.aiautocreate.domain.repository.IModelsRepository
 import com.aiautocreate.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -247,7 +247,7 @@ class HomeViewModel @Inject constructor(
                 )
 
                 orchestrator.events.collect { event ->
-                    if (!coroutineContext.isActive) return@collect
+                    if (!currentCoroutineContext().isActive) return@collect
                     when (event) {
                         is PipelineEvent.Progress -> _state.update {
                             it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
@@ -266,7 +266,7 @@ class HomeViewModel @Inject constructor(
 
                 orchestrator.execute(config)
             } catch (e: Exception) {
-                if (coroutineContext.isActive) {
+                if (currentCoroutineContext().isActive) {
                     _state.update { it.copy(isProcessing = false, errorMessage = e.message) }
                 }
             } finally {
