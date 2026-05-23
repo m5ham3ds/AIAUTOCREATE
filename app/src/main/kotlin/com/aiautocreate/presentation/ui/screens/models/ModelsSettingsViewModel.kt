@@ -11,6 +11,7 @@ import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.repository.IModelsRepository
 import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.domain.usecase.model.RefreshModelsStylesUseCase
+import com.aiautocreate.util.NetworkUtils
 import com.aiautocreate.worker.BackgroundStyleRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -117,8 +118,7 @@ class ModelsSettingsViewModel @Inject constructor(
                 .collect { allModels ->
                     val enabledModels = allModels.filter { it.isEnabled }
                     val grouped = categories.associate { (category, _) ->
-                        category to enabledModels.filter { it.category == category }
-                            .map { ModelInfo(it.modelId, it.modelName) }
+                        category to enabledModels.map { ModelInfo(it.modelId, it.modelName) }
                     }
                     _state.update { it.copy(availableModelsByCategory = grouped) }
                 }
@@ -204,21 +204,33 @@ class ModelsSettingsViewModel @Inject constructor(
                     appSettingsRepo.setBoolean("tts_use_clone_${currentTtsModelId}", s.ttsUseVoiceClone)
                 }
 
-                _state.update { it.copy(isSaving = false, saveSuccessMessage = "تم حفظ الإعدادات بنجاح 💾") }
+                _state.update { it.copy(isSaving = false, saveSuccessMessage = "✅ تم حفظ الإعدادات بنجاح") }
             } catch (e: Exception) {
-                _state.update { it.copy(isSaving = false, errorMessage = "فشل الحفظ: ${e.message}") }
+                _state.update { it.copy(isSaving = false, errorMessage = "❌ فشل الحفظ: ${e.message}") }
             }
         }
     }
 
     fun refreshModelsInBackground() {
         viewModelScope.launch {
+            // التحقق من الاتصال بالإنترنت
+            if (!NetworkUtils.isOnline(application)) {
+                _state.update { it.copy(errorMessage = "📡 لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.") }
+                return@launch
+            }
+
             _state.update { it.copy(isRefreshing = true, errorMessage = null, saveSuccessMessage = null) }
-            val workRequest = OneTimeWorkRequestBuilder<BackgroundStyleRefresher>().build()
-            WorkManager.getInstance(application).enqueue(workRequest)
-            delay(3000)
-            loadModelsByCategory()
-            _state.update { it.copy(isRefreshing = false, saveSuccessMessage = "تم تحديث القوائم في الخلفية") }
+            _state.update { it.copy(saveSuccessMessage = "🔄 جاري تحديث القوائم... قد يستغرق بضع ثوانٍ.") }
+
+            try {
+                val workRequest = OneTimeWorkRequestBuilder<BackgroundStyleRefresher>().build()
+                WorkManager.getInstance(application).enqueue(workRequest)
+                delay(3000)
+                loadModelsByCategory()
+                _state.update { it.copy(isRefreshing = false, saveSuccessMessage = "✅ تم تحديث القوائم بنجاح!") }
+            } catch (e: Exception) {
+                _state.update { it.copy(isRefreshing = false, errorMessage = "❌ فشل تحديث القوائم: ${e.message}") }
+            }
         }
     }
 
