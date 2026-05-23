@@ -35,11 +35,17 @@ fun ModelsSettingsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(state.saveSuccessMessage) {
-        state.saveSuccessMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearMessages() }
-    }
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearMessages() }
+
+    // عرض رسائل Snackbar عند وجود saveSuccessMessage أو errorMessage
+    LaunchedEffect(state.saveSuccessMessage, state.errorMessage) {
+        state.saveSuccessMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+        state.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
     }
 
     Box(
@@ -64,6 +70,11 @@ fun ModelsSettingsScreen(
                 VoiceCloneSection(state, viewModel)
                 Spacer(modifier = Modifier.height(Spacing.md))
             }
+
+            // ✅ قسم إعدادات الوكيل (تم إصلاح هيكله)
+            AgentSettingsSection(state, viewModel)
+
+            Spacer(modifier = Modifier.height(Spacing.md))
 
             Button(
                 onClick = { viewModel.refreshModelsInBackground() },
@@ -91,6 +102,22 @@ fun ModelsSettingsScreen(
             }
         }
     }
+
+    // SnackbarHost
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(Spacing.lg),
+        snackbarHost = { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = CardDark,
+                contentColor = TextPrimary,
+                actionColor = PrimaryLight
+            )
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,24 +169,22 @@ private fun ApiKeysSection(state: ModelsSettingsState, viewModel: ModelsSettings
             )
             Spacer(modifier = Modifier.height(Spacing.md))
 
-            // بعد OutlinedTextField الخاص بـ Gemini API Key
-Spacer(modifier = Modifier.height(Spacing.md))
+            OutlinedTextField(
+                value = state.geminiKeysCsv,
+                onValueChange = { viewModel.onGeminiKeysChanged(it) },
+                label = { Text("قائمة مفاتيح Gemini (مفصولة بفواصل)") },
+                placeholder = { Text("مثال: AIza..., AIza..., AIza...") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = false,
+                maxLines = 5,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryLight,
+                    unfocusedBorderColor = BorderInput,
+                    cursorColor = PrimaryLight
+                )
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.geminiKeysCsv,
-    onValueChange = { viewModel.onGeminiKeysChanged(it) },
-    label = { Text("قائمة مفاتيح Gemini (مفصولة بفواصل)") },
-    placeholder = { Text("مثال: AIza..., AIza..., AIza...") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = false,
-    maxLines = 5,
-    colors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = PrimaryLight,
-        unfocusedBorderColor = BorderInput,
-        cursorColor = PrimaryLight
-    )
-)
-            
             OutlinedTextField(
                 value = state.huggingFaceToken,
                 onValueChange = { viewModel.onHuggingFaceTokenChanged(it) },
@@ -170,24 +195,22 @@ OutlinedTextField(
             )
             Spacer(modifier = Modifier.height(Spacing.md))
 
-// بعد OutlinedTextField الخاص بـ HuggingFace Token
-Spacer(modifier = Modifier.height(Spacing.md))
+            OutlinedTextField(
+                value = state.huggingFaceTokensCsv,
+                onValueChange = { viewModel.onHuggingFaceTokensChanged(it) },
+                label = { Text("قائمة توكنات HuggingFace (مفصولة بفواصل)") },
+                placeholder = { Text("مثال: hf_token1, hf_token2, hf_token3") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = false,
+                maxLines = 5,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryLight,
+                    unfocusedBorderColor = BorderInput,
+                    cursorColor = PrimaryLight
+                )
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
 
-OutlinedTextField(
-    value = state.huggingFaceTokensCsv,
-    onValueChange = { viewModel.onHuggingFaceTokensChanged(it) },
-    label = { Text("قائمة توكنات HuggingFace (مفصولة بفواصل)") },
-    placeholder = { Text("مثال: hf_token1, hf_token2, hf_token3") },
-    modifier = Modifier.fillMaxWidth(),
-    singleLine = false,
-    maxLines = 5,
-    colors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = PrimaryLight,
-        unfocusedBorderColor = BorderInput,
-        cursorColor = PrimaryLight
-    )
-)
-            
             OutlinedTextField(
                 value = state.ttsUrl,
                 onValueChange = { viewModel.onTtsUrlChanged(it) },
@@ -270,20 +293,19 @@ OutlinedTextField(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DynamicModelSelectionSection(state: ModelsSettingsState, viewModel: ModelsSettingsViewModel) {
-    // داخل DynamicModelSelectionSection, استبدل قائمة categories بالقائمة التالية:
-val categories = listOf(
-    "text" to "نموذج نصوص",
-    "image" to "نموذج توليد الصور",
-    "video" to "نموذج تحويل الصورة إلى فيديو",
-    "tts" to "نموذج تحويل النص إلى صوت",
-    "analysis" to "نموذج التحليل والمعالجة",
-    "reviewer" to "نموذج مراجعة وتصحيح",
-    "orchestrator" to "نموذج التنسيق العام",
-    "music" to "نموذج توليد موسيقى",
-    "transition" to "نموذج الانتقالات",
-    "subtitle" to "نموذج الترجمة",
-    "ffmpeg" to "نموذج أوامر FFmpeg"
-)
+    val categories = listOf(
+        "text" to "نموذج نصوص",
+        "image" to "نموذج توليد الصور",
+        "video" to "نموذج تحويل الصورة إلى فيديو",
+        "tts" to "نموذج تحويل النص إلى صوت",
+        "analysis" to "نموذج التحليل والمعالجة",
+        "reviewer" to "نموذج مراجعة وتصحيح",
+        "orchestrator" to "نموذج التنسيق العام",
+        "music" to "نموذج توليد موسيقى",
+        "transition" to "نموذج الانتقالات",
+        "subtitle" to "نموذج الترجمة",
+        "ffmpeg" to "نموذج أوامر FFmpeg"
+    )
 
     Box(
         modifier = Modifier
@@ -353,7 +375,6 @@ val categories = listOf(
                         expanded = dropdownExpanded,
                         onDismissRequest = { dropdownExpanded = false }
                     ) {
-                        // ✅ إضافة onClick فارغ للعنصر "لا شيء" لتجنب خطأ "No value passed for parameter 'onClick'"
                         DropdownMenuItem(
                             text = { Text("لا شيء", color = TextHint) },
                             onClick = {
@@ -371,11 +392,10 @@ val categories = listOf(
                             )
                         }
                         if (availableModels.isEmpty()) {
-                            // ✅ العنصر المعطل يجب أن يحتوي أيضاً على onClick فارغ (أو null) لكن Material3 يتطلب onClick غير nullable
                             DropdownMenuItem(
                                 text = { Text("لا توجد نماذج متاحة", color = TextHint) },
                                 enabled = false,
-                                onClick = {} // ✅ إضافة onClick فارغ لتجنب الخطأ
+                                onClick = {}
                             )
                         }
                     }
@@ -451,113 +471,113 @@ private fun VoiceCloneSection(state: ModelsSettingsState, viewModel: ModelsSetti
             }
         }
     }
+}
 
-// ✅ قسم إعدادات الوكيل
-Box(
-    modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = Spacing.lg)
-        .clip(RoundedCornerShape(Radius.xxl))
-        .background(CardPrimary)
-        .padding(Spacing.lg)
-) {
-    Column {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                painterResource(id = R.drawable.ic_smart_toy),
-                contentDescription = "Agent Settings",
-                modifier = Modifier.size(IconSize.lg),
-                tint = PrimaryLight
-            )
-            Text(
-                "إعدادات الوكيل الذكي",
-                Modifier.weight(1f),
-                textAlign = TextAlign.End,
-                color = TextPrimary,
-                fontSize = AppFontSize.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md), color = BorderSecondary)
-
-        // النموذج الأساسي
-        val textModels = state.availableModelsByCategory["text"] ?: emptyList()
-        val defaultModelId = state.defaultAgentModelId
-        var defaultModelDropdownExpanded by remember { mutableStateOf(false) }
-
-        Text(
-            "النموذج الأساسي للوكيل",
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.End,
-            color = TextHint,
-            fontSize = AppFontSize.bodyLarge
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ComponentSize.buttonHeightLg)
-                .clip(RoundedCornerShape(Radius.lg))
-                .background(CardSecondary)
-                .clickable { defaultModelDropdownExpanded = true }
-                .padding(horizontal = Spacing.lg),
-            contentAlignment = Alignment.Center
-        ) {
-            val selectedName = textModels.find { it.modelId == defaultModelId }?.modelName ?: "اختر نموذجاً"
-            Text(
-                selectedName,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.End,
-                color = TextPrimary,
-                fontSize = AppFontSize.bodyMedium
-            )
-        }
-        DropdownMenu(
-            expanded = defaultModelDropdownExpanded,
-            onDismissRequest = { defaultModelDropdownExpanded = false }
-        ) {
-            textModels.forEach { model ->
-                DropdownMenuItem(
-                    text = { Text(model.modelName) },
-                    onClick = {
-                        viewModel.onDefaultAgentModelChanged(model.modelId)
-                        defaultModelDropdownExpanded = false
-                    }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AgentSettingsSection(state: ModelsSettingsState, viewModel: ModelsSettingsViewModel) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg)
+            .clip(RoundedCornerShape(Radius.xxl))
+            .background(CardPrimary)
+            .padding(Spacing.lg)
+    ) {
+        Column {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painterResource(id = R.drawable.ic_smart_toy),
+                    contentDescription = "Agent Settings",
+                    modifier = Modifier.size(IconSize.lg),
+                    tint = PrimaryLight
+                )
+                Text(
+                    "إعدادات الوكيل الذكي",
+                    Modifier.weight(1f),
+                    textAlign = TextAlign.End,
+                    color = TextPrimary,
+                    fontSize = AppFontSize.headlineMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
-        }
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md), color = BorderSecondary)
 
-        Spacer(Modifier.height(Spacing.md))
+            // النموذج الأساسي
+            val textModels = state.availableModelsByCategory["text"] ?: emptyList()
+            val defaultModelId = state.defaultAgentModelId
+            var defaultModelDropdownExpanded by remember { mutableStateOf(false) }
 
-        // ترتيب النماذج الاحتياطية (قائمة قابلة للسحب – نسخة مبسطة)
-        Text(
-            "ترتيب النماذج الاحتياطية (اسحب لإعادة الترتيب)",
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.End,
-            color = TextHint,
-            fontSize = AppFontSize.bodySmall
-        )
-        Spacer(Modifier.height(Spacing.xs))
-        // هنا يمكن إضافة قائمة قابلة للسحب، لكن سنكتفي بعرضها كنص CSV مؤقتاً
-        // يمكن تحسينها لاحقاً
-        OutlinedTextField(
-            value = state.fallbackAgentModelsOrder.joinToString(", "),
-            onValueChange = { csv ->
-                val newOrder = csv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                viewModel.onFallbackAgentModelsOrderChanged(newOrder)
-            },
-            label = { Text("معرفات النماذج الاحتياطية (مفصولة بفواصل)") },
-            placeholder = { Text("gemini-2.0-flash, Qwen/Qwen2.5-7B-Instruct, ...") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = false,
-            maxLines = 3,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PrimaryLight,
-                unfocusedBorderColor = BorderInput,
-                cursorColor = PrimaryLight
+            Text(
+                "النموذج الأساسي للوكيل",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.End,
+                color = TextHint,
+                fontSize = AppFontSize.bodyLarge
             )
-        )
+            Spacer(Modifier.height(Spacing.sm))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ComponentSize.buttonHeightLg)
+                    .clip(RoundedCornerShape(Radius.lg))
+                    .background(CardSecondary)
+                    .clickable { defaultModelDropdownExpanded = true }
+                    .padding(horizontal = Spacing.lg),
+                contentAlignment = Alignment.Center
+            ) {
+                val selectedName = textModels.find { it.modelId == defaultModelId }?.modelName ?: "اختر نموذجاً"
+                Text(
+                    selectedName,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End,
+                    color = TextPrimary,
+                    fontSize = AppFontSize.bodyMedium
+                )
+            }
+            DropdownMenu(
+                expanded = defaultModelDropdownExpanded,
+                onDismissRequest = { defaultModelDropdownExpanded = false }
+            ) {
+                textModels.forEach { model ->
+                    DropdownMenuItem(
+                        text = { Text(model.modelName) },
+                        onClick = {
+                            viewModel.onDefaultAgentModelChanged(model.modelId)
+                            defaultModelDropdownExpanded = false
+                        }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+
+            // ترتيب النماذج الاحتياطية
+            Text(
+                "ترتيب النماذج الاحتياطية",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.End,
+                color = TextHint,
+                fontSize = AppFontSize.bodyLarge
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            OutlinedTextField(
+                value = state.fallbackAgentModelsOrder.joinToString(", "),
+                onValueChange = { csv ->
+                    val newOrder = csv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    viewModel.onFallbackAgentModelsOrderChanged(newOrder)
+                },
+                label = { Text("معرفات النماذج الاحتياطية (مفصولة بفواصل)") },
+                placeholder = { Text("gemini-2.0-flash, Qwen/Qwen2.5-7B-Instruct, ...") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = false,
+                maxLines = 3,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryLight,
+                    unfocusedBorderColor = BorderInput,
+                    cursorColor = PrimaryLight
+                )
+            )
+        }
     }
-}
-    
 }
