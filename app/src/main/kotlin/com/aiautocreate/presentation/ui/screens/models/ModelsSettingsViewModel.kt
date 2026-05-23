@@ -109,6 +109,7 @@ class ModelsSettingsViewModel @Inject constructor(
         }
     }
 
+    // ✅ التصحيح الجوهري: تصفية النماذج حسب الفئة المخزنة في model.category (CSV)
     private fun loadModelsByCategory() {
         viewModelScope.launch {
             modelsRepo.getAllModelConfigs()
@@ -118,7 +119,11 @@ class ModelsSettingsViewModel @Inject constructor(
                 .collect { allModels ->
                     val enabledModels = allModels.filter { it.isEnabled }
                     val grouped = categories.associate { (category, _) ->
-                        category to enabledModels.map { ModelInfo(it.modelId, it.modelName) }
+                        val modelsForCategory = enabledModels.filter { model ->
+                            val modelCategories = model.category.split(",").map { it.trim() }
+                            modelCategories.contains(category)
+                        }.map { ModelInfo(it.modelId, it.modelName) }
+                        category to modelsForCategory
                     }
                     _state.update { it.copy(availableModelsByCategory = grouped) }
                 }
@@ -211,9 +216,9 @@ class ModelsSettingsViewModel @Inject constructor(
         }
     }
 
+    // ✅ تحسين عملية تحديث القوائم: زيادة وقت الانتظار وتحميل النماذج بعدها
     fun refreshModelsInBackground() {
         viewModelScope.launch {
-            // التحقق من الاتصال بالإنترنت
             if (!NetworkUtils.isOnline(application)) {
                 _state.update { it.copy(errorMessage = "📡 لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.") }
                 return@launch
@@ -225,7 +230,8 @@ class ModelsSettingsViewModel @Inject constructor(
             try {
                 val workRequest = OneTimeWorkRequestBuilder<BackgroundStyleRefresher>().build()
                 WorkManager.getInstance(application).enqueue(workRequest)
-                delay(3000)
+                // ✅ زيادة المدة للتأكد من اكتمال العمل
+                delay(5000)
                 loadModelsByCategory()
                 _state.update { it.copy(isRefreshing = false, saveSuccessMessage = "✅ تم تحديث القوائم بنجاح!") }
             } catch (e: Exception) {
