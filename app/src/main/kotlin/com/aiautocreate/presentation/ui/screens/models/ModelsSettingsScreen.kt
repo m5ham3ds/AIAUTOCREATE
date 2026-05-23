@@ -103,22 +103,13 @@ fun ModelsSettingsScreen(
         }
     }
 
-    // SnackbarHost
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(Spacing.lg),
-        snackbarHost = { data ->
-            Snackbar(
-                snackbarData = data,
-                containerColor = CardDark,
-                contentColor = TextPrimary,
-                actionColor = PrimaryLight
-            )
-        }
-    )
-}
+// SnackbarHost - تمت إزالة snackbarHost
+SnackbarHost(
+    hostState = snackbarHostState,
+    modifier = Modifier
+        .align(Alignment.BottomCenter)
+        .padding(Spacing.lg)
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
