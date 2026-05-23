@@ -137,22 +137,14 @@ fun ModelsManagerScreen(
                 }
             }
         }
-
+        
         // ✅ SnackbarHost لعرض الإشعارات
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(Spacing.lg),
-            snackbarHost = { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = CardDark,
-                    contentColor = TextPrimary,
-                    actionColor = PrimaryLight
-                )
-            }
-        )
+SnackbarHost(
+    hostState = snackbarHostState,
+    modifier = Modifier
+        .align(Alignment.BottomCenter)
+        .padding(Spacing.lg)
+)
 
         FloatingActionButton(
             onClick = { selectedTab = "add" },
