@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -32,7 +33,6 @@ class HomeViewModel @Inject constructor(
         checkConnection()
     }
 
-    // ✅ دالة عامة لإعادة تحميل القوائم (يتم استدعاؤها من الشاشة عند الظهور)
     fun loadStylesAndSelections() {
         viewModelScope.launch {
             try {
@@ -148,7 +148,6 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { settingsRepo.setString("sel_montage_style", style) }
     }
 
-    // ✅ عرض حوار تأكيد الإلغاء
     fun showCancelDialog() {
         _state.update { it.copy(showCancelDialog = true) }
     }
@@ -157,7 +156,6 @@ class HomeViewModel @Inject constructor(
         _state.update { it.copy(showCancelDialog = false) }
     }
 
-    // ✅ إلغاء العملية الجارية
     fun cancelProcessing() {
         processingJob?.cancel()
         processingJob = null
@@ -176,7 +174,6 @@ class HomeViewModel @Inject constructor(
 
     fun startProcessing() {
         val s = _state.value
-        // ✅ التحقق من صحة الإدخال والاتصال
         if (s.promptText.isBlank()) {
             _state.update { it.copy(errorMessage = "⚠️ الرجاء إدخال نص الفكرة") }
             return
@@ -193,7 +190,6 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        // إلغاء أي عملية سابقة قبل البدء
         processingJob?.cancel()
 
         processingJob = viewModelScope.launch {
@@ -251,26 +247,26 @@ class HomeViewModel @Inject constructor(
                 )
 
                 orchestrator.events.collect { event ->
-    if (!currentCoroutineContext().isActive) return@collect
-    when (event) {
-        is PipelineEvent.Progress -> _state.update {
-            it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
-        }
-        is PipelineEvent.Log -> _state.update {
-            it.copy(logs = it.logs + event.message)
-        }
-        is PipelineEvent.Error -> _state.update {
-            it.copy(errorMessage = event.message, isProcessing = false)
-        }
-        is PipelineEvent.FinalResult -> _state.update {
-            it.copy(outputVideoPath = event.outputFile, isProcessing = false, progress = 1f, progressText = "100%")
-        }
-    }
-}
+                    if (!coroutineContext.isActive) return@collect
+                    when (event) {
+                        is PipelineEvent.Progress -> _state.update {
+                            it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
+                        }
+                        is PipelineEvent.Log -> _state.update {
+                            it.copy(logs = it.logs + event.message)
+                        }
+                        is PipelineEvent.Error -> _state.update {
+                            it.copy(errorMessage = event.message, isProcessing = false)
+                        }
+                        is PipelineEvent.FinalResult -> _state.update {
+                            it.copy(outputVideoPath = event.outputFile, isProcessing = false, progress = 1f, progressText = "100%")
+                        }
+                    }
+                }
 
                 orchestrator.execute(config)
             } catch (e: Exception) {
-                if (isActive) {
+                if (coroutineContext.isActive) {
                     _state.update { it.copy(isProcessing = false, errorMessage = e.message) }
                 }
             } finally {
