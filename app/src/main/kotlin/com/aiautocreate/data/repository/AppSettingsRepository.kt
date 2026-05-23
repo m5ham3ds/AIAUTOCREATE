@@ -222,11 +222,12 @@ class AppSettingsRepository @Inject constructor(
             setString(key, items.joinToString(","))
         }
     }
-}
-// إضافة هذه الدالة
-suspend fun getHuggingFaceToken(): String? {
-    val token = getStringOnce("hf_token", "")
-    return if (token.isNotBlank()) token else null
+
+    // ✅ دالة للحصول على توكن HuggingFace (للاستخدام في PipelineOrchestrator)
+    suspend fun getHuggingFaceToken(): String? {
+        val token = getStringOnce("hf_token", "")
+        return if (token.isNotBlank()) token else null
+    }
 }
 
 // ================== Extensions ==================
