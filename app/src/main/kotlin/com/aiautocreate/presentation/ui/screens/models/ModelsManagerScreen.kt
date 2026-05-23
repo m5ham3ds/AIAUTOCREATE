@@ -57,6 +57,7 @@ fun ModelsManagerScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf("active") }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // ✅ إعادة تحميل النماذج عند العودة إلى الشاشة (بعد حفظ الإعدادات)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -68,6 +69,13 @@ fun ModelsManagerScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // ✅ عرض الإشعارات
+    LaunchedEffect(state.successMessage, state.errorMessage, state.infoMessage) {
+        state.successMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearMessages() }
+        state.errorMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearMessages() }
+        state.infoMessage?.let { snackbarHostState.showSnackbar(it); viewModel.clearMessages() }
     }
 
     Box(
@@ -130,6 +138,22 @@ fun ModelsManagerScreen(
             }
         }
 
+        // ✅ SnackbarHost لعرض الإشعارات
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(Spacing.lg),
+            snackbarHost = { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = CardDark,
+                    contentColor = TextPrimary,
+                    actionColor = PrimaryLight
+                )
+            }
+        )
+
         FloatingActionButton(
             onClick = { selectedTab = "add" },
             modifier = Modifier
@@ -182,6 +206,15 @@ private fun TabButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsManagerState) {
+    // ✅ متغيرات لاختيار الفئات المتعددة
+    var selectedCategories by remember { mutableStateOf(state.editableModel?.categories ?: listOf("analysis")) }
+    var categoryDropdownExpanded by remember { mutableStateOf(false) }
+
+    // تحديث القائمة المحلية عند تغير editableModel
+    LaunchedEffect(state.editableModel) {
+        selectedCategories = state.editableModel?.categories ?: listOf("analysis")
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -403,46 +436,51 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
 
-                    Text("الفئة", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                    // ✅ اختيار الفئات المتعددة
+                    Text("الفئات", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(modifier = Modifier.height(Spacing.xs))
-                    var categoryExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(
-                        expanded = categoryExpanded,
-                        onExpandedChange = { categoryExpanded = it }
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.lg))
+                            .background(CardInputDark)
+                            .clickable { categoryDropdownExpanded = true }
+                            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(ComponentSize.buttonHeightLg)
-                                .clip(RoundedCornerShape(Radius.lg))
-                                .background(CardInputDark)
-                                .menuAnchor()
-                                .clickable { categoryExpanded = true }
-                                .padding(horizontal = Spacing.lg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = categoriesMap[state.editableModel.category] ?: "اختر الفئة",
-                                color = TextPrimary,
-                                fontSize = AppFontSize.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        ExposedDropdownMenu(
-                            expanded = categoryExpanded,
-                            onDismissRequest = { categoryExpanded = false }
-                        ) {
-                            categoriesList.forEach { (value, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        viewModel.updateEditableCategory(value)
-                                        categoryExpanded = false
+                        Text(
+                            text = if (selectedCategories.isEmpty()) "اختر الفئات" else selectedCategories.map { categoriesMap[it] ?: it }.joinToString(", "),
+                            color = TextPrimary,
+                            fontSize = AppFontSize.bodyMedium,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false }
+                    ) {
+                        categoriesList.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(
+                                            checked = selectedCategories.contains(value),
+                                            onCheckedChange = { isChecked ->
+                                                selectedCategories = if (isChecked) {
+                                                    selectedCategories + value
+                                                } else {
+                                                    selectedCategories - value
+                                                }
+                                                viewModel.updateEditableCategories(selectedCategories)
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(Spacing.sm))
+                                        Text(label)
                                     }
-                                )
-                            }
+                                },
+                                onClick = { }
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(Spacing.sm))
@@ -538,7 +576,7 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
     }
 }
 
-// ✅ بطاقة النموذج المحسّنة مع حوار احترافي (باستخدام القائمة الموحدة)
+// ✅ بطاقة النموذج المحسّنة مع حوار احترافي (باستخدام القائمة الموحدة ودعم الفئات المتعددة)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelManagerCard(
@@ -548,6 +586,9 @@ private fun ModelManagerCard(
 ) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // ✅ تحويل الفئات المخزنة كـ CSV إلى قائمة
+    val modelCategories = model.category.split(",").filter { it.isNotBlank() }
 
     Box(
         modifier = Modifier
@@ -580,8 +621,12 @@ private fun ModelManagerCard(
                     if (model.description.isNotEmpty()) {
                         Text(model.description.take(80), color = TextBody, fontSize = AppFontSize.bodySmall)
                     }
-                    if (model.category.isNotEmpty()) {
-                        Text("الفئة: ${categoriesMap[model.category] ?: model.category}", color = TextHint, fontSize = AppFontSize.caption)
+                    if (modelCategories.isNotEmpty()) {
+                        Text(
+                            text = "الفئات: ${modelCategories.map { categoriesMap[it] ?: it }.joinToString(", ")}",
+                            color = TextHint,
+                            fontSize = AppFontSize.caption
+                        )
                     }
                 }
                 Row(
@@ -633,15 +678,15 @@ private fun ModelManagerCard(
         }
     }
 
-    // حوار تعديل النموذج المحسّن
+    // حوار تعديل النموذج المحسّن (يدعم الفئات المتعددة)
     if (showSettingsDialog) {
         var editedName by remember { mutableStateOf(model.modelName) }
-        var editedCategory by remember { mutableStateOf(model.category) }
+        var editedCategories by remember { mutableStateOf(modelCategories) }
         var editedEnabled by remember { mutableStateOf(model.isEnabled) }
         var editedModelUrl by remember { mutableStateOf(model.settingsUrl) }
         var editedReadmeUrl by remember { mutableStateOf(model.readmeUrl) }
         var editedSupportsVoiceCloning by remember { mutableStateOf(model.supportsVoiceCloning) }
-        var categoryExpanded by remember { mutableStateOf(false) }
+        var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
@@ -675,45 +720,48 @@ private fun ModelManagerCard(
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
 
-                    Text("الفئة", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                    Text("الفئات", color = TextHint, fontSize = AppFontSize.bodyMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     Spacer(modifier = Modifier.height(Spacing.xs))
-                    ExposedDropdownMenuBox(
-                        expanded = categoryExpanded,
-                        onExpandedChange = { categoryExpanded = it }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.lg))
+                            .background(CardInputDark)
+                            .clickable { categoryDropdownExpanded = true }
+                            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(ComponentSize.buttonHeightLg)
-                                .clip(RoundedCornerShape(Radius.lg))
-                                .background(CardInputDark)
-                                .menuAnchor()
-                                .clickable { categoryExpanded = true }
-                                .padding(horizontal = Spacing.lg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = categoriesMap[editedCategory] ?: "اختر الفئة",
-                                color = TextPrimary,
-                                fontSize = AppFontSize.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        ExposedDropdownMenu(
-                            expanded = categoryExpanded,
-                            onDismissRequest = { categoryExpanded = false }
-                        ) {
-                            categoriesList.forEach { (value, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        editedCategory = value
-                                        categoryExpanded = false
+                        Text(
+                            text = if (editedCategories.isEmpty()) "اختر الفئات" else editedCategories.map { categoriesMap[it] ?: it }.joinToString(", "),
+                            color = TextPrimary,
+                            fontSize = AppFontSize.bodyMedium,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false }
+                    ) {
+                        categoriesList.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(
+                                            checked = editedCategories.contains(value),
+                                            onCheckedChange = { isChecked ->
+                                                editedCategories = if (isChecked) {
+                                                    editedCategories + value
+                                                } else {
+                                                    editedCategories - value
+                                                }
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(Spacing.sm))
+                                        Text(label)
                                     }
-                                )
-                            }
+                                },
+                                onClick = { }
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(Spacing.md))
@@ -781,7 +829,7 @@ private fun ModelManagerCard(
                     onClick = {
                         val updatedModel = model.copy(
                             modelName = editedName,
-                            category = editedCategory,
+                            category = editedCategories.joinToString(","), // ✅ تخزين كـ CSV
                             isEnabled = editedEnabled,
                             settingsUrl = editedModelUrl,
                             readmeUrl = editedReadmeUrl,
