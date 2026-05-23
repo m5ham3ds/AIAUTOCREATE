@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.Asset
+import com.aiautocreate.asset.LocalAssetProvider
 import com.aiautocreate.data.asset.*
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
@@ -98,7 +99,7 @@ class PipelineOrchestrator @Inject constructor(
     private val lotsOfSoundsProvider: LotsOfSoundsAssetProvider,
     private val freesoundProvider: FreesoundAssetProvider,
     private val openVfxProvider: OpenVFXAssetProvider,
-    private val localAssetProvider: LocalAssetProvider?, // ✅ جعله اختياريًا لتجنب خطأ KSP
+    private val localAssetProvider: LocalAssetProvider?, // ✅ اختياري
     @com.aiautocreate.di.Dispatcher(com.aiautocreate.di.DispatcherType.IO)
     private val ioDispatcher: CoroutineDispatcher
 ) {
@@ -108,7 +109,6 @@ class PipelineOrchestrator @Inject constructor(
         add(lotsOfSoundsProvider)
         add(freesoundProvider)
         add(openVfxProvider)
-        // ✅ إضافة LocalAssetProvider فقط إذا كان موجوداً (غير null)
         localAssetProvider?.let { add(it) }
     }
 
