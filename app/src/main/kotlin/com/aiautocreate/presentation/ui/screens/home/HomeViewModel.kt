@@ -251,22 +251,22 @@ class HomeViewModel @Inject constructor(
                 )
 
                 orchestrator.events.collect { event ->
-                    if (!isActive) return@collect // إذا تم الإلغاء، نتوقف
-                    when (event) {
-                        is PipelineEvent.Progress -> _state.update {
-                            it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
-                        }
-                        is PipelineEvent.Log -> _state.update {
-                            it.copy(logs = it.logs + event.message)
-                        }
-                        is PipelineEvent.Error -> _state.update {
-                            it.copy(errorMessage = event.message, isProcessing = false)
-                        }
-                        is PipelineEvent.FinalResult -> _state.update {
-                            it.copy(outputVideoPath = event.outputFile, isProcessing = false, progress = 1f, progressText = "100%")
-                        }
-                    }
-                }
+    if (!currentCoroutineContext().isActive) return@collect
+    when (event) {
+        is PipelineEvent.Progress -> _state.update {
+            it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
+        }
+        is PipelineEvent.Log -> _state.update {
+            it.copy(logs = it.logs + event.message)
+        }
+        is PipelineEvent.Error -> _state.update {
+            it.copy(errorMessage = event.message, isProcessing = false)
+        }
+        is PipelineEvent.FinalResult -> _state.update {
+            it.copy(outputVideoPath = event.outputFile, isProcessing = false, progress = 1f, progressText = "100%")
+        }
+    }
+}
 
                 orchestrator.execute(config)
             } catch (e: Exception) {
