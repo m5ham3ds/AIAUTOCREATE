@@ -2,7 +2,7 @@ package com.aiautocreate.presentation.ui.screens.models
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aiautocreate.AIAutoCreateApp   // ✅ استيراد التطبيق للتحقق من الإنترنت
+import com.aiautocreate.AIAutoCreateApp
 import com.aiautocreate.agent.HuggingFaceTokenManager
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
 import com.aiautocreate.data.datasource.remote.dto.response.HfModelInfo
@@ -10,10 +10,12 @@ import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.ISettingsRepository
 import com.aiautocreate.domain.usecase.model.CheckApiModelsUseCase
 import com.aiautocreate.domain.usecase.model.ManageModelsUseCase
-import com.aiautocreate.util.NetworkUtils           // ✅ استيراد أداة الشبكة
+import com.aiautocreate.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import retrofit2.HttpException
 import timber.log.Timber
 import javax.inject.Inject
@@ -24,7 +26,8 @@ class ModelsManagerViewModel @Inject constructor(
     private val checkApiModelsUseCase: CheckApiModelsUseCase,
     private val huggingFaceApi: HuggingFaceApi,
     private val secureSettingsRepo: ISettingsRepository,
-    private val tokenManager: HuggingFaceTokenManager
+    private val tokenManager: HuggingFaceTokenManager,
+    private val okHttpClient: OkHttpClient  // ✅ إضافة عميل HTTP لجلب بيانات GitHub
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -123,7 +126,7 @@ class ModelsManagerViewModel @Inject constructor(
                             customDescription = modelInfo.cardData?.description ?: "لا يوجد وصف متاح",
                             isEnabled = true,
                             categories = listOf(guessCategoryFromPipelineTag(modelInfo.pipelineTag)),
-                            settingsUrl = "",
+                            settingsUrl = "https://huggingface.co/${modelInfo.id}",
                             readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
                             supportedStyles = "",
                             supportsVoiceCloning = false
@@ -182,7 +185,6 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
-    // ✅ دالة لتحديث قائمة الفئات
     fun updateEditableCategories(categories: List<String>) {
         _state.update { state ->
             val current = state.editableModel ?: return@update state
@@ -218,38 +220,140 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
+    // ===================== دوال جلب معلومات GitHub =====================
+    private suspend fun fetchGitHubReadmeInfo(repoUrl: String): GitHubInfo? {
+        return try {
+            // تحويل رابط GitHub إلى رابط RAW للملف الرئيسي
+            val rawUrl = repoUrl
+                .replace("github.com", "raw.githubusercontent.com")
+                .replace("/blob/", "/")
+                .trimEnd('/') + "/main/README.md"
+            val request = Request.Builder().url(rawUrl).build()
+            val response = okHttpClient.newCall(request).execute()
+            if (response.isSuccessful && response.body != null) {
+                val content = response.body!!.string()
+                val description = extractDescriptionFromReadme(content)
+                val tags = extractTagsFromReadme(content)
+                GitHubInfo(description, tags)
+            } else {
+                // محاولة فرع master بدلاً من main
+                val rawUrlMaster = repoUrl
+                    .replace("github.com", "raw.githubusercontent.com")
+                    .replace("/blob/", "/")
+                    .trimEnd('/') + "/master/README.md"
+                val requestMaster = Request.Builder().url(rawUrlMaster).build()
+                val responseMaster = okHttpClient.newCall(requestMaster).execute()
+                if (responseMaster.isSuccessful && responseMaster.body != null) {
+                    val content = responseMaster.body!!.string()
+                    val description = extractDescriptionFromReadme(content)
+                    val tags = extractTagsFromReadme(content)
+                    GitHubInfo(description, tags)
+                } else null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "فشل جلب README من GitHub")
+            null
+        }
+    }
+
+    private fun extractDescriptionFromReadme(content: String): String {
+        // استخراج أول 200 حرف من أول فقرة غير فارغة
+        val lines = content.lines()
+        var description = ""
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && !trimmed.startsWith("[") && !trimmed.startsWith("```")) {
+                description = trimmed.take(250)
+                break
+            }
+        }
+        return description.ifEmpty { content.take(200).replace("\n", " ") }
+    }
+
+    private fun extractTagsFromReadme(content: String): List<String> {
+        val keywords = listOf(
+            "text-to-image", "image-to-image", "text-to-video", "image-to-video",
+            "text-to-speech", "tts", "LLM", "diffusion", "transformer", "vision",
+            "multimodal", "audio", "music", "code", "translation", "summarization",
+            "question-answering", "conversational", "embedding", "classification",
+            "object-detection", "segmentation", "inpainting", "controlnet", "lora"
+        )
+        val contentLower = content.lowercase()
+        return keywords.filter { contentLower.contains(it) }.distinct()
+    }
+
+    data class GitHubInfo(
+        val description: String,
+        val tags: List<String>
+    )
+
+    // ===================== إضافة النموذج مع تحسين البيانات من GitHub =====================
     fun addModelFromSearch() {
         val editable = _state.value.editableModel ?: return
         val original = editable.original
 
-        val modelConfig = ModelConfig(
-            id = 0,
-            modelId = original.id,
-            modelName = editable.customName,
-            provider = "huggingface",
-            isEnabled = editable.isEnabled,
-            description = editable.customDescription,
-            pipelineTag = original.pipelineTag ?: "",
-            tags = original.tags ?: emptyList(),
-            modelUrl = "https://huggingface.co/${original.id}",
-            category = editable.categories.joinToString(","),   // ✅ تخزين الفئات كـ CSV
-            settingsUrl = editable.settingsUrl,
-            readmeUrl = editable.readmeUrl,
-            supportedStyles = if (editable.supportedStyles.isNotBlank()) {
-                editable.supportedStyles.split(",").map { it.trim() }
-            } else emptyList(),
-            supportsVoiceCloning = editable.supportsVoiceCloning,
-            apiEndpoint = null,
-            parametersJson = null,
-            createdAt = System.currentTimeMillis()
-        )
-
         viewModelScope.launch {
             _state.update { it.copy(isAdding = true) }
+
+            // محاولة جلب معلومات إضافية من GitHub إذا كان هناك رابط صالح
+            var enhancedDescription = editable.customDescription
+            var enhancedTags = original.tags?.toMutableList() ?: mutableListOf()
+            var gitHubInfo: GitHubInfo? = null
+
+            // التحقق من رابط GitHub في settingsUrl (إذا كان المستخدم قد أدخل رابط GitHub يدوياً)
+            val githubUrl = if (editable.settingsUrl.contains("github.com")) {
+                editable.settingsUrl
+            } else if (original.id.contains("/") && original.id.split("/").size >= 2) {
+                // محاولة بناء رابط GitHub تلقائي من اسم المستخدم/النموذج (ليس دائماً صحيحاً لكن قد يفيد)
+                "https://github.com/${original.id}"
+            } else null
+
+            if (githubUrl != null) {
+                gitHubInfo = fetchGitHubReadmeInfo(githubUrl)
+                if (gitHubInfo != null) {
+                    if (gitHubInfo.description.isNotBlank()) {
+                        enhancedDescription = gitHubInfo.description
+                    }
+                    enhancedTags.addAll(gitHubInfo.tags)
+                }
+            }
+
+            // إزالة التكرار في الوسوم
+            val finalTags = enhancedTags.distinct()
+
+            val modelConfig = ModelConfig(
+                id = 0,
+                modelId = original.id,
+                modelName = editable.customName,
+                provider = "huggingface",
+                isEnabled = editable.isEnabled,
+                description = enhancedDescription,
+                pipelineTag = original.pipelineTag ?: "",
+                tags = finalTags,
+                modelUrl = "https://huggingface.co/${original.id}",
+                category = editable.categories.joinToString(","),
+                settingsUrl = editable.settingsUrl,
+                readmeUrl = editable.readmeUrl,
+                supportedStyles = if (editable.supportedStyles.isNotBlank()) {
+                    editable.supportedStyles.split(",").map { it.trim() }
+                } else emptyList(),
+                supportsVoiceCloning = editable.supportsVoiceCloning,
+                apiEndpoint = null,
+                parametersJson = null,
+                createdAt = System.currentTimeMillis()
+            )
+
             manageModelsUseCase.addModel(modelConfig)
-            _state.update { it.copy(isAdding = false, searchedModel = null, editableModel = null, searchQuery = "") }
+            _state.update {
+                it.copy(
+                    isAdding = false,
+                    searchedModel = null,
+                    editableModel = null,
+                    searchQuery = ""
+                )
+            }
             loadModels()
-            setSuccessMessage("✅ تم إضافة النموذج \"${modelConfig.modelName}\" بنجاح")
+            setSuccessMessage("✅ تم إضافة النموذج \"${modelConfig.modelName}\" بنجاح مع بيانات محسّنة من GitHub")
         }
     }
 
@@ -259,7 +363,6 @@ class ModelsManagerViewModel @Inject constructor(
 
     fun searchModelsByCategory() {
         viewModelScope.launch {
-            // ✅ التحقق من الاتصال بالإنترنت
             if (!NetworkUtils.isOnline(AIAutoCreateApp.instance)) {
                 setErrorMessage("📡 لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.")
                 return@launch
@@ -301,7 +404,7 @@ class ModelsManagerViewModel @Inject constructor(
             customDescription = modelInfo.cardData?.description ?: "لا يوجد وصف متاح",
             isEnabled = true,
             categories = listOf(guessCategoryFromPipelineTag(modelInfo.pipelineTag)),
-            settingsUrl = "",
+            settingsUrl = "https://huggingface.co/${modelInfo.id}",
             readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
             supportedStyles = "",
             supportsVoiceCloning = false
