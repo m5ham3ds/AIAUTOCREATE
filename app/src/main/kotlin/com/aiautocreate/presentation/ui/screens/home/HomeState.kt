@@ -6,18 +6,17 @@ data class HomeState(
     val isConnected: Boolean = false,
 
     // القوائم المنسدلة (قيم مختارة + الخيارات المتاحة)
+    val selectedMontageStyle: String = "قصص وروايات",
     val selectedImageStyle: String = "واقعي",
     val selectedCoverStyle: String = "غلاف بسيط",
     val selectedVoice: String = "صوت 1",
     val selectedVideoStyle: String = "درامي",
-    val selectedMontageStyle: String = "قصص وروايات",
 
-    // ✅ سيتم تعبئة هذه القوائم ديناميكياً من النماذج النشطة
+    val montageStyles: List<String> = emptyList(),
     val imageStyles: List<String> = emptyList(),
-    val coverStyles: List<String> = emptyList(),   // قد يبقى من CSV أو يتم دمجه مع أنماط الصور
+    val coverStyles: List<String> = emptyList(),
     val voiceOptions: List<String> = emptyList(),
     val videoStyles: List<String> = emptyList(),
-    val montageStyles: List<String> = emptyList(),
 
     // حقل الإدخال
     val promptText: String = "",
@@ -30,6 +29,9 @@ data class HomeState(
     val isProcessing: Boolean = false,
     val progress: Float = 0f,
     val progressText: String = "0%",
+
+    // ✅ حوار إلغاء العملية
+    val showCancelDialog: Boolean = false,
 
     // عام
     val errorMessage: String? = null,
