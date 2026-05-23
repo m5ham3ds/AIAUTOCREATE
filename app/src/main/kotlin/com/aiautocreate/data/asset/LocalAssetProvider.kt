@@ -1,4 +1,4 @@
-package com.aiautocreate.asset
+package com.aiautocreate.data.asset
 
 import com.aiautocreate.AIAutoCreateApp
 import com.aiautocreate.agent.Asset
