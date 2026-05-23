@@ -10,6 +10,7 @@ import com.aiautocreate.domain.pipeline.PipelineOrchestrator
 import com.aiautocreate.domain.repository.IModelsRepository
 import com.aiautocreate.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,6 +25,8 @@ class HomeViewModel @Inject constructor(
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
+    private var processingJob: Job? = null
+
     init {
         loadStylesAndSelections()
         checkConnection()
@@ -33,15 +36,11 @@ class HomeViewModel @Inject constructor(
     fun loadStylesAndSelections() {
         viewModelScope.launch {
             try {
-                // 1. الأنماط الخاصة بالنماذج المختارة فقط (وليس كل النماذج)
                 val imageStyles = getSupportedStylesForCategory("image")
                 val videoStyles = getSupportedStylesForCategory("video")
                 val ttsOptions = getSupportedStylesForCategory("tts")
-
-                // 2. أنماط المونتاج من إعدادات FFmpeg (المخزنة في CSV)
                 val montageStyles = getMontageStylesFromSettings()
 
-                // 3. قراءة القيم المختارة حالياً من التخزين
                 val selImage = settingsRepo.getStringOnce("sel_image_style", imageStyles.firstOrNull() ?: "واقعي")
                 val selCover = settingsRepo.getStringOnce("sel_cover_style", "غلاف بسيط")
                 val selVoice = settingsRepo.getStringOnce("sel_voice", ttsOptions.firstOrNull() ?: "صوت1")
@@ -69,7 +68,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ✅ جلب الأنماط المدعومة من النموذج المحدد فقط (يتم اختياره من إعدادات النماذج)
     private suspend fun getSupportedStylesForCategory(category: String): List<String> {
         val selectedModelId = settingsRepo.getSelectedModelForCategory(category)
         if (selectedModelId.isBlank()) return emptyList()
@@ -78,7 +76,6 @@ class HomeViewModel @Inject constructor(
         return model?.supportedStyles ?: emptyList()
     }
 
-    // ✅ جلب أنماط المونتاج من إعدادات FFmpeg (المخزنة في CSV)
     private suspend fun getMontageStylesFromSettings(): List<String> {
         val csv = settingsRepo.getStringOnce("montage_styles_csv", "قصص وروايات,حماسي وجذاب,احترافية وأنيق,مخصص")
         return settingsRepo.csvToList(csv)
@@ -151,10 +148,37 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { settingsRepo.setString("sel_montage_style", style) }
     }
 
+    // ✅ عرض حوار تأكيد الإلغاء
+    fun showCancelDialog() {
+        _state.update { it.copy(showCancelDialog = true) }
+    }
+
+    fun hideCancelDialog() {
+        _state.update { it.copy(showCancelDialog = false) }
+    }
+
+    // ✅ إلغاء العملية الجارية
+    fun cancelProcessing() {
+        processingJob?.cancel()
+        processingJob = null
+        _state.update {
+            it.copy(
+                isProcessing = false,
+                progress = 0f,
+                progressText = "0%",
+                logs = emptyList(),
+                outputVideoPath = null,
+                errorMessage = "تم إلغاء العملية بواسطة المستخدم",
+                showCancelDialog = false
+            )
+        }
+    }
+
     fun startProcessing() {
         val s = _state.value
+        // ✅ التحقق من صحة الإدخال والاتصال
         if (s.promptText.isBlank()) {
-            _state.update { it.copy(errorMessage = "الرجاء إدخال نص الفكرة") }
+            _state.update { it.copy(errorMessage = "⚠️ الرجاء إدخال نص الفكرة") }
             return
         }
         if (s.isProcessing) return
@@ -162,14 +186,17 @@ class HomeViewModel @Inject constructor(
         if (!NetworkUtils.isOnline(AIAutoCreateApp.instance)) {
             _state.update {
                 it.copy(
-                    errorMessage = "لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.",
+                    errorMessage = "📡 لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك وإعادة المحاولة.",
                     isProcessing = false
                 )
             }
             return
         }
 
-        viewModelScope.launch {
+        // إلغاء أي عملية سابقة قبل البدء
+        processingJob?.cancel()
+
+        processingJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     isProcessing = true,
@@ -177,7 +204,8 @@ class HomeViewModel @Inject constructor(
                     progressText = "0%",
                     logs = emptyList(),
                     outputVideoPath = null,
-                    errorMessage = null
+                    errorMessage = null,
+                    showCancelDialog = false
                 )
             }
 
@@ -223,6 +251,7 @@ class HomeViewModel @Inject constructor(
                 )
 
                 orchestrator.events.collect { event ->
+                    if (!isActive) return@collect // إذا تم الإلغاء، نتوقف
                     when (event) {
                         is PipelineEvent.Progress -> _state.update {
                             it.copy(progress = event.percent / 100f, progressText = "${event.percent}%")
@@ -241,7 +270,11 @@ class HomeViewModel @Inject constructor(
 
                 orchestrator.execute(config)
             } catch (e: Exception) {
-                _state.update { it.copy(isProcessing = false, errorMessage = e.message) }
+                if (isActive) {
+                    _state.update { it.copy(isProcessing = false, errorMessage = e.message) }
+                }
+            } finally {
+                processingJob = null
             }
         }
     }
