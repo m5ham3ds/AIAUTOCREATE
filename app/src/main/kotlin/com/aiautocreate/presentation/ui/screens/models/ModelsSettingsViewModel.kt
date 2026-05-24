@@ -242,7 +242,7 @@ class ModelsSettingsViewModel @Inject constructor(
             var updatedCount = 0
             WorkManager.getInstance(application)
                 .getWorkInfoByIdFlow(workRequest.id)
-                .filter { it.state.isFinished }
+                .filter { workInfo -> workInfo != null && workInfo.state.isFinished }
                 .firstOrNull()
                 ?.let { workInfo ->
                     updatedCount = workInfo.outputData.getInt(BackgroundStyleRefresher.KEY_UPDATED_MODELS_COUNT, 0)
@@ -250,7 +250,7 @@ class ModelsSettingsViewModel @Inject constructor(
 
             loadModelsByCategory()
 
-            val message =	 if (updatedCount > 0) {
+            val message = if (updatedCount > 0) {
                 "✅ تم تحديث $updatedCount عنصر بنجاح"
             } else {
                 "⚠️ لم يتم تحديث أي عنصر. تأكد من اختيار نماذج في الإعدادات ومن وجود توكن HuggingFace صالح."
@@ -266,7 +266,6 @@ class ModelsSettingsViewModel @Inject constructor(
         }
     }
 }
-
     fun clearMessages() {
         _state.update { it.copy(saveSuccessMessage = null, errorMessage = null) }
     }
