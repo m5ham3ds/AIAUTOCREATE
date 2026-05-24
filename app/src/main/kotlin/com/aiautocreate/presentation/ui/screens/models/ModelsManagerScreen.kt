@@ -139,12 +139,12 @@ fun ModelsManagerScreen(
         }
         
         // ✅ SnackbarHost لعرض الإشعارات
-SnackbarHost(
-    hostState = snackbarHostState,
-    modifier = Modifier
-        .align(Alignment.BottomCenter)
-        .padding(Spacing.lg)
-)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(Spacing.lg)
+        )
 
         FloatingActionButton(
             onClick = { selectedTab = "add" },
@@ -495,8 +495,24 @@ private fun AddModelContent(viewModel: ModelsManagerViewModel, state: ModelsMana
                     OutlinedTextField(
                         value = state.editableModel.readmeUrl,
                         onValueChange = { viewModel.updateEditableReadmeUrl(it) },
-                        label = { Text("رابط README") },
+                        label = { Text("رابط README (HuggingFace)") },
                         placeholder = { Text("https://huggingface.co/.../README.md") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryLight,
+                            unfocusedBorderColor = BorderInput,
+                            cursorColor = PrimaryLight
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+
+                    // ✅ حقل GitHub README الجديد
+                    OutlinedTextField(
+                        value = state.editableModel.githubReadmeUrl,
+                        onValueChange = { viewModel.updateEditableGithubReadmeUrl(it) },
+                        label = { Text("رابط GitHub README (اختياري)") },
+                        placeholder = { Text("https://github.com/username/repo") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -678,6 +694,7 @@ private fun ModelManagerCard(
         var editedModelUrl by remember { mutableStateOf(model.settingsUrl) }
         var editedReadmeUrl by remember { mutableStateOf(model.readmeUrl) }
         var editedSupportsVoiceCloning by remember { mutableStateOf(model.supportsVoiceCloning) }
+        var editedGithubReadmeUrl by remember { mutableStateOf(model.githubReadmeUrl ?: "") } // ✅ رابط GitHub
         var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
         AlertDialog(
@@ -795,8 +812,24 @@ private fun ModelManagerCard(
                     OutlinedTextField(
                         value = editedReadmeUrl,
                         onValueChange = { editedReadmeUrl = it },
-                        label = { Text("رابط README") },
+                        label = { Text("رابط README (HuggingFace)") },
                         placeholder = { Text("https://huggingface.co/.../README.md") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryLight,
+                            unfocusedBorderColor = BorderInput,
+                            cursorColor = PrimaryLight
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // ✅ حقل GitHub README الجديد
+                    OutlinedTextField(
+                        value = editedGithubReadmeUrl,
+                        onValueChange = { editedGithubReadmeUrl = it },
+                        label = { Text("رابط GitHub README (اختياري)") },
+                        placeholder = { Text("https://github.com/...") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -821,10 +854,11 @@ private fun ModelManagerCard(
                     onClick = {
                         val updatedModel = model.copy(
                             modelName = editedName,
-                            category = editedCategories.joinToString(","), // ✅ تخزين كـ CSV
+                            category = editedCategories.joinToString(","),
                             isEnabled = editedEnabled,
                             settingsUrl = editedModelUrl,
                             readmeUrl = editedReadmeUrl,
+                            githubReadmeUrl = editedGithubReadmeUrl.takeIf { it.isNotBlank() }, // ✅ حفظ رابط GitHub
                             supportsVoiceCloning = editedSupportsVoiceCloning
                         )
                         scope.launch { viewModel.updateModel(updatedModel) }
