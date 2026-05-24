@@ -19,6 +19,12 @@ class RefreshModelsStylesUseCase @Inject constructor(
     private val okHttpClient: OkHttpClient
 ) {
 
+    // الفئات التي يمكن تحديثها (نصوص لا تحتاج تحديث عادة)
+    private val updatableCategories = setOf(
+        "image", "video", "tts", "analysis", "reviewer",
+        "orchestrator", "music", "transition", "subtitle", "ffmpeg"
+    )
+
     private val categories = listOf(
         "text", "image", "video", "tts", "analysis",
         "reviewer", "orchestrator", "music", "transition", "subtitle", "ffmpeg"
@@ -30,12 +36,17 @@ class RefreshModelsStylesUseCase @Inject constructor(
     suspend fun refreshAll(): Int = withContext(Dispatchers.IO) {
         val selectedModels = getSelectedModelsFromSettings()
         if (selectedModels.isEmpty()) {
-            Timber.e("لا توجد نماذج مختارة. الرجاء اختيار نماذج في إعدادات النماذج.")
+            Timber.w("لا توجد نماذج مختارة. الرجاء اختيار نماذج في إعدادات النماذج.")
             return@withContext 0
         }
 
         var updatedCount = 0
         for ((category, modelId) in selectedModels) {
+            // تخطي النماذج من فئة "text" لأنها لا تحتوي على أنماط README عادة
+            if (category == "text") {
+                Timber.d("تخطي نموذج نصوص $modelId (لا يحتاج تحديث أنماط)")
+                continue
+            }
             if (refreshSingleModel(modelId, category)) {
                 updatedCount++
             }
@@ -52,16 +63,23 @@ class RefreshModelsStylesUseCase @Inject constructor(
 
     private suspend fun refreshSingleModel(modelId: String, category: String): Boolean {
         return try {
+            // إذا لم يكن النموذج من HuggingFace (لا يحتوي على "/" وليس gemini-2.0-flash)، نتخطى
+            if (!modelId.contains("/") && modelId != "gemini-2.0-flash") {
+                Timber.d("النموذج $modelId ليس من HuggingFace، تخطي التحديث")
+                return false
+            }
+
             val token = settingsRepo.getHuggingFaceToken()
             if (token.isNullOrBlank()) {
-                Timber.e("لا يوجد توكن HuggingFace. يرجى إضافة توكن في الإعدادات.")
+                Timber.e("لا يوجد توكن HuggingFace لتحديث $modelId")
                 return false
             }
 
             // 1. جلب البيانات من HuggingFace API
             val hfResponse = huggingFaceApi.getModelInfo(modelId, "Bearer $token")
             if (!hfResponse.isSuccessful || hfResponse.body() == null) {
-                Timber.e("فشل جلب بيانات HuggingFace للنموذج $modelId (كود ${hfResponse.code()})")
+                Timber.w("فشل جلب بيانات HuggingFace للنموذج $modelId (كود ${hfResponse.code()})")
+                // محاولة تحديث من README المخزن فقط إذا كان موجوداً مسبقاً
                 return updateFromExistingReadme(modelId, category)
             }
             val hfModel = hfResponse.body()!!
@@ -73,7 +91,7 @@ class RefreshModelsStylesUseCase @Inject constructor(
             val hfTags = extractTagsFromReadme(hfReadmeContent)
             val hfStyles = extractStylesFromTags(hfTags)
 
-            // 3. البحث عن النموذج في قاعدة البيانات
+            // 3. البحث عن النموذج الحالي
             val existingModels = modelsRepository.getAllModelConfigs().first()
             val existing = existingModels.find { it.modelId == modelId }
             val savedGithubUrl = existing?.githubReadmeUrl
