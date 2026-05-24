@@ -56,14 +56,12 @@ class RefreshModelsStylesUseCase @Inject constructor(
             if (!hfResponse.isSuccessful || hfResponse.body() == null) return false
             val hfModel = hfResponse.body()!!
 
-            // جلب README من HuggingFace
             val hfReadmeUrl = "https://huggingface.co/${modelId}/raw/main/README.md"
             val hfReadmeContent = fetchReadmeContent(hfReadmeUrl)
             val hfDescription = extractDescriptionFromReadme(hfReadmeContent)
             val hfTags = extractTagsFromReadme(hfReadmeContent)
             val hfStyles = extractStylesFromTags(hfTags)
 
-            // البحث عن النموذج الحالي للحصول على githubReadmeUrl إن وُجد
             val existingModels = modelsRepository.getAllModelConfigs().first()
             val existing = existingModels.find { it.modelId == modelId }
             val savedGithubUrl = existing?.githubReadmeUrl
@@ -83,6 +81,7 @@ class RefreshModelsStylesUseCase @Inject constructor(
             val finalStyles = (hfStyles + githubStyles).distinct()
 
             if (existing != null) {
+                // ✅ استخدام updateModel (الموجود في IModelsRepository)
                 val updatedModel = existing.copy(
                     description = finalDescription.take(500),
                     tags = finalTags,
@@ -92,9 +91,10 @@ class RefreshModelsStylesUseCase @Inject constructor(
                     githubReadmeUrl = githubUrl,
                     updatedAt = System.currentTimeMillis()
                 )
-                modelsRepository.updateModelConfig(updatedModel)
+                modelsRepository.updateModel(updatedModel)
                 true
             } else {
+                // ✅ استخدام addModel (الموجود في IModelsRepository)
                 val newModel = ModelConfig(
                     modelId = modelId,
                     modelName = hfModel.cardData?.title?.takeIf { it.isNotBlank() } ?: modelId.split("/").last(),
@@ -113,7 +113,7 @@ class RefreshModelsStylesUseCase @Inject constructor(
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 )
-                modelsRepository.addModelConfig(newModel)
+                modelsRepository.addModel(newModel)
                 true
             }
         } catch (e: Exception) {
