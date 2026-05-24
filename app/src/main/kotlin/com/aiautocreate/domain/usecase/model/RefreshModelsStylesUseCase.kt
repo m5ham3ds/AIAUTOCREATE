@@ -13,7 +13,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 class RefreshModelsStylesUseCase @Inject constructor(
-    private val modelsRepository: IModelsRepository,  // ✅ استخدام IModelsRepository مباشرة
+    private val modelsRepository: IModelsRepository,
     private val settingsRepo: AppSettingsRepository,
     private val huggingFaceApi: HuggingFaceApi,
     private val okHttpClient: OkHttpClient
@@ -24,10 +24,13 @@ class RefreshModelsStylesUseCase @Inject constructor(
         "reviewer", "orchestrator", "music", "transition", "subtitle", "ffmpeg"
     )
 
+    /**
+     * @return عدد النماذج التي تم تحديثها بنجاح
+     */
     suspend fun refreshAll(): Int = withContext(Dispatchers.IO) {
         val selectedModels = getSelectedModelsFromSettings()
         if (selectedModels.isEmpty()) {
-            Timber.d("لا توجد نماذج مختارة للتحديث")
+            Timber.e("لا توجد نماذج مختارة. الرجاء اختيار نماذج في إعدادات النماذج.")
             return@withContext 0
         }
 
@@ -50,19 +53,27 @@ class RefreshModelsStylesUseCase @Inject constructor(
     private suspend fun refreshSingleModel(modelId: String, category: String): Boolean {
         return try {
             val token = settingsRepo.getHuggingFaceToken()
-            if (token.isNullOrBlank()) return false
+            if (token.isNullOrBlank()) {
+                Timber.e("لا يوجد توكن HuggingFace. يرجى إضافة توكن في الإعدادات.")
+                return false
+            }
 
+            // 1. جلب البيانات من HuggingFace API
             val hfResponse = huggingFaceApi.getModelInfo(modelId, "Bearer $token")
-            if (!hfResponse.isSuccessful || hfResponse.body() == null) return false
+            if (!hfResponse.isSuccessful || hfResponse.body() == null) {
+                Timber.e("فشل جلب بيانات HuggingFace للنموذج $modelId (كود ${hfResponse.code()})")
+                return updateFromExistingReadme(modelId, category)
+            }
             val hfModel = hfResponse.body()!!
 
+            // 2. جلب README من HuggingFace
             val hfReadmeUrl = "https://huggingface.co/${modelId}/raw/main/README.md"
             val hfReadmeContent = fetchReadmeContent(hfReadmeUrl)
             val hfDescription = extractDescriptionFromReadme(hfReadmeContent)
             val hfTags = extractTagsFromReadme(hfReadmeContent)
             val hfStyles = extractStylesFromTags(hfTags)
 
-            // البحث عن النموذج الحالي
+            // 3. البحث عن النموذج في قاعدة البيانات
             val existingModels = modelsRepository.getAllModelConfigs().first()
             val existing = existingModels.find { it.modelId == modelId }
             val savedGithubUrl = existing?.githubReadmeUrl
@@ -72,17 +83,19 @@ class RefreshModelsStylesUseCase @Inject constructor(
                 "https://github.com/${modelId}"
             }
 
+            // 4. جلب README من GitHub
             val githubContent = fetchReadmeContent(githubUrl)
             val githubDescription = extractDescriptionFromReadme(githubContent)
             val githubTags = extractTagsFromReadme(githubContent)
             val githubStyles = extractStylesFromTags(githubTags)
 
+            // 5. دمج البيانات
             val finalDescription = if (githubDescription.isNotBlank()) githubDescription else hfDescription
             val finalTags = (hfTags + githubTags).distinct()
             val finalStyles = (hfStyles + githubStyles).distinct()
 
+            // 6. حفظ أو تحديث النموذج
             if (existing != null) {
-                // ✅ تحديث النموذج الموجود باستخدام updateModelConfig
                 val updatedModel = existing.copy(
                     description = finalDescription.take(500),
                     tags = finalTags,
@@ -93,9 +106,8 @@ class RefreshModelsStylesUseCase @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
                 modelsRepository.updateModelConfig(updatedModel)
-                true
+                Timber.d("تم تحديث النموذج $modelId")
             } else {
-                // ✅ إضافة نموذج جديد باستخدام insertModelConfig
                 val newModel = ModelConfig(
                     modelId = modelId,
                     modelName = hfModel.cardData?.title?.takeIf { it.isNotBlank() } ?: modelId.split("/").last(),
@@ -115,10 +127,44 @@ class RefreshModelsStylesUseCase @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
                 modelsRepository.insertModelConfig(newModel)
-                true
+                Timber.d("تم إضافة النموذج الجديد $modelId")
             }
+            true
         } catch (e: Exception) {
-            Timber.e(e, "فشل تحديث $modelId")
+            Timber.e(e, "استثناء أثناء تحديث $modelId")
+            updateFromExistingReadme(modelId, category)
+        }
+    }
+
+    private suspend fun updateFromExistingReadme(modelId: String, category: String): Boolean {
+        return try {
+            val existingModels = modelsRepository.getAllModelConfigs().first()
+            val existing = existingModels.find { it.modelId == modelId }
+            if (existing == null) {
+                Timber.e("النموذج $modelId غير موجود في قاعدة البيانات")
+                return false
+            }
+            val githubUrl = existing.githubReadmeUrl
+            if (githubUrl.isNullOrBlank()) {
+                Timber.d("لا يوجد GitHub README للنموذج $modelId")
+                return false
+            }
+            val content = fetchReadmeContent(githubUrl)
+            if (content.isBlank()) return false
+            val tags = extractTagsFromReadme(content)
+            val styles = extractStylesFromTags(tags)
+            val description = extractDescriptionFromReadme(content)
+            val updatedModel = existing.copy(
+                description = description.take(500),
+                tags = tags,
+                supportedStyles = styles,
+                updatedAt = System.currentTimeMillis()
+            )
+            modelsRepository.updateModelConfig(updatedModel)
+            Timber.d("تم تحديث $modelId من GitHub README فقط")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "فشل التحديث الاحتياطي لـ $modelId")
             false
         }
     }
