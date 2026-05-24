@@ -228,38 +228,41 @@ class ModelsSettingsViewModel @Inject constructor(
         }
 
         _state.update {
-            it.copy(isRefreshing = true, errorMessage = null, saveSuccessMessage = "🔄 جاري تحديث القوائم...")
+            it.copy(
+                isRefreshing = true,
+                errorMessage = null,
+                saveSuccessMessage = "🔄 جاري تحديث القوائم... قد يستغرق بضع ثوانٍ."
+            )
         }
 
         try {
             val workRequest = BackgroundStyleRefresher.createWorkRequest()
             WorkManager.getInstance(application).enqueue(workRequest)
 
-            // ✅ الحل المثالي: استخدام Flow مع جمع آمن للنتيجة
             var updatedCount = 0
             WorkManager.getInstance(application)
                 .getWorkInfoByIdFlow(workRequest.id)
-                .filter { workInfo -> workInfo != null && workInfo.state.isFinished }
+                .filter { it.state.isFinished }
                 .firstOrNull()
                 ?.let { workInfo ->
                     updatedCount = workInfo.outputData.getInt(BackgroundStyleRefresher.KEY_UPDATED_MODELS_COUNT, 0)
                 }
 
             loadModelsByCategory()
+
+            val message = if (updatedCount > 0) {
+                "✅ تم تحديث $updatedCount عنصر بنجاح"
+            } else {
+                "⚠️ لم يتم تحديث أي عنصر. تأكد من اختيار نماذج في الإعدادات ومن وجود توكن HuggingFace صالح."
+            }
+            _state.update { it.copy(isRefreshing = false, saveSuccessMessage = message) }
+        } catch (e: Exception) {
             _state.update {
                 it.copy(
                     isRefreshing = false,
-                    saveSuccessMessage = if (updatedCount > 0) "✅ تم تحديث $updatedCount عنصر"
-                    else "✅ تم التحديث (لا توجد عناصر جديدة)"
+                    errorMessage = "❌ فشل التحديث: ${e.message}"
                 )
             }
-        } catch (e: Exception) {
-            _state.update { it.copy(isRefreshing = false, errorMessage = "❌ فشل التحديث: ${e.message}") }
         }
-    }
-}
-
-    fun clearMessages() {
-        _state.update { it.copy(saveSuccessMessage = null, errorMessage = null) }
     }
 }
