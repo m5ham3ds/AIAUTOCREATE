@@ -7,8 +7,8 @@ data class ModelsManagerState(
     val models: List<ModelConfig> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
-    val successMessage: String? = null,   // ✅ رسالة نجاح
-    val infoMessage: String? = null,      // ✅ رسالة معلومات (مثل بدء البحث)
+    val successMessage: String? = null,
+    val infoMessage: String? = null,
     val searchQuery: String = "",
     val isSearching: Boolean = false,
     val searchedModel: HfModelInfo? = null,
@@ -25,9 +25,10 @@ data class EditableModel(
     val customName: String,
     val customDescription: String,
     val isEnabled: Boolean = true,
-    val categories: List<String> = listOf("analysis"),   // ✅ تغيير category إلى categories (قائمة)
+    val categories: List<String> = listOf("analysis"),
     val settingsUrl: String = "",
     val readmeUrl: String = "",
+    val githubReadmeUrl: String = "",      // ✅ جديد: رابط GitHub README
     val supportedStyles: String = "",
     val supportsVoiceCloning: Boolean = false
 )
