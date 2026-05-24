@@ -13,7 +13,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 class RefreshModelsStylesUseCase @Inject constructor(
-    private val modelsRepository: IModelsRepository,
+    private val modelsRepository: IModelsRepository,  // ✅ استخدام IModelsRepository مباشرة
     private val settingsRepo: AppSettingsRepository,
     private val huggingFaceApi: HuggingFaceApi,
     private val okHttpClient: OkHttpClient
@@ -62,6 +62,7 @@ class RefreshModelsStylesUseCase @Inject constructor(
             val hfTags = extractTagsFromReadme(hfReadmeContent)
             val hfStyles = extractStylesFromTags(hfTags)
 
+            // البحث عن النموذج الحالي
             val existingModels = modelsRepository.getAllModelConfigs().first()
             val existing = existingModels.find { it.modelId == modelId }
             val savedGithubUrl = existing?.githubReadmeUrl
@@ -81,7 +82,7 @@ class RefreshModelsStylesUseCase @Inject constructor(
             val finalStyles = (hfStyles + githubStyles).distinct()
 
             if (existing != null) {
-                // ✅ استخدام updateModel (الموجود في IModelsRepository)
+                // ✅ تحديث النموذج الموجود باستخدام updateModelConfig
                 val updatedModel = existing.copy(
                     description = finalDescription.take(500),
                     tags = finalTags,
@@ -91,10 +92,10 @@ class RefreshModelsStylesUseCase @Inject constructor(
                     githubReadmeUrl = githubUrl,
                     updatedAt = System.currentTimeMillis()
                 )
-                modelsRepository.updateModel(updatedModel)
+                modelsRepository.updateModelConfig(updatedModel)
                 true
             } else {
-                // ✅ استخدام addModel (الموجود في IModelsRepository)
+                // ✅ إضافة نموذج جديد باستخدام insertModelConfig
                 val newModel = ModelConfig(
                     modelId = modelId,
                     modelName = hfModel.cardData?.title?.takeIf { it.isNotBlank() } ?: modelId.split("/").last(),
@@ -113,7 +114,7 @@ class RefreshModelsStylesUseCase @Inject constructor(
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 )
-                modelsRepository.addModel(newModel)
+                modelsRepository.insertModelConfig(newModel)
                 true
             }
         } catch (e: Exception) {
