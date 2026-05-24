@@ -27,7 +27,7 @@ class ModelsManagerViewModel @Inject constructor(
     private val huggingFaceApi: HuggingFaceApi,
     private val secureSettingsRepo: ISettingsRepository,
     private val tokenManager: HuggingFaceTokenManager,
-    private val okHttpClient: OkHttpClient  // ✅ إضافة عميل HTTP لجلب بيانات GitHub
+    private val okHttpClient: OkHttpClient
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ModelsManagerState())
@@ -128,6 +128,7 @@ class ModelsManagerViewModel @Inject constructor(
                             categories = listOf(guessCategoryFromPipelineTag(modelInfo.pipelineTag)),
                             settingsUrl = "https://huggingface.co/${modelInfo.id}",
                             readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
+                            githubReadmeUrl = "https://github.com/${modelInfo.id}",  // ✅ تخمين رابط GitHub
                             supportedStyles = "",
                             supportsVoiceCloning = false
                         )
@@ -206,6 +207,14 @@ class ModelsManagerViewModel @Inject constructor(
         }
     }
 
+    // ✅ دالة جديدة لتحديث رابط GitHub README
+    fun updateEditableGithubReadmeUrl(url: String) {
+        _state.update { state ->
+            val current = state.editableModel ?: return@update state
+            state.copy(editableModel = current.copy(githubReadmeUrl = url))
+        }
+    }
+
     fun updateEditableSupportedStyles(styles: String) {
         _state.update { state ->
             val current = state.editableModel ?: return@update state
@@ -223,7 +232,6 @@ class ModelsManagerViewModel @Inject constructor(
     // ===================== دوال جلب معلومات GitHub =====================
     private suspend fun fetchGitHubReadmeInfo(repoUrl: String): GitHubInfo? {
         return try {
-            // تحويل رابط GitHub إلى رابط RAW للملف الرئيسي
             val rawUrl = repoUrl
                 .replace("github.com", "raw.githubusercontent.com")
                 .replace("/blob/", "/")
@@ -236,7 +244,6 @@ class ModelsManagerViewModel @Inject constructor(
                 val tags = extractTagsFromReadme(content)
                 GitHubInfo(description, tags)
             } else {
-                // محاولة فرع master بدلاً من main
                 val rawUrlMaster = repoUrl
                     .replace("github.com", "raw.githubusercontent.com")
                     .replace("/blob/", "/")
@@ -257,7 +264,6 @@ class ModelsManagerViewModel @Inject constructor(
     }
 
     private fun extractDescriptionFromReadme(content: String): String {
-        // استخراج أول 200 حرف من أول فقرة غير فارغة
         val lines = content.lines()
         var description = ""
         for (line in lines) {
@@ -295,16 +301,16 @@ class ModelsManagerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isAdding = true) }
 
-            // محاولة جلب معلومات إضافية من GitHub إذا كان هناك رابط صالح
             var enhancedDescription = editable.customDescription
             var enhancedTags = original.tags?.toMutableList() ?: mutableListOf()
             var gitHubInfo: GitHubInfo? = null
 
-            // التحقق من رابط GitHub في settingsUrl (إذا كان المستخدم قد أدخل رابط GitHub يدوياً)
-            val githubUrl = if (editable.settingsUrl.contains("github.com")) {
+            // استخدم الرابط المخصص من المستخدم أو التخميني
+            val githubUrl = if (editable.githubReadmeUrl.isNotBlank()) {
+                editable.githubReadmeUrl
+            } else if (editable.settingsUrl.contains("github.com")) {
                 editable.settingsUrl
             } else if (original.id.contains("/") && original.id.split("/").size >= 2) {
-                // محاولة بناء رابط GitHub تلقائي من اسم المستخدم/النموذج (ليس دائماً صحيحاً لكن قد يفيد)
                 "https://github.com/${original.id}"
             } else null
 
@@ -318,7 +324,6 @@ class ModelsManagerViewModel @Inject constructor(
                 }
             }
 
-            // إزالة التكرار في الوسوم
             val finalTags = enhancedTags.distinct()
 
             val modelConfig = ModelConfig(
@@ -334,6 +339,7 @@ class ModelsManagerViewModel @Inject constructor(
                 category = editable.categories.joinToString(","),
                 settingsUrl = editable.settingsUrl,
                 readmeUrl = editable.readmeUrl,
+                githubReadmeUrl = githubUrl,  // ✅ حفظ رابط GitHub
                 supportedStyles = if (editable.supportedStyles.isNotBlank()) {
                     editable.supportedStyles.split(",").map { it.trim() }
                 } else emptyList(),
@@ -406,6 +412,7 @@ class ModelsManagerViewModel @Inject constructor(
             categories = listOf(guessCategoryFromPipelineTag(modelInfo.pipelineTag)),
             settingsUrl = "https://huggingface.co/${modelInfo.id}",
             readmeUrl = "https://huggingface.co/${modelInfo.id}/raw/main/README.md",
+            githubReadmeUrl = "https://github.com/${modelInfo.id}",  // ✅ رابط GitHub تخميني
             supportedStyles = "",
             supportsVoiceCloning = false
         )
