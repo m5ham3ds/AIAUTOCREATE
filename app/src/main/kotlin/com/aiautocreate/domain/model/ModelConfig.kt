@@ -11,14 +11,18 @@ data class ModelConfig(
     val tags: List<String> = emptyList(),   // وسوم إضافية
     val modelUrl: String = "",              // رابط النموذج على HuggingFace
 
-    // ✅ الحقول الجديدة
-    val category: String = "",              // فئة النموذج: "image", "video", "tts", "analysis", "reviewer", "orchestrator", "music", "transition", "subtitle"
-    val settingsUrl: String = "",           // رابط صفحة الإعدادات الخاصة بالنموذج (اختياري)
-    val readmeUrl: String = "",             // رابط ملف README.md (لجلب الأنماط والوسوم)
-    val supportedStyles: List<String> = emptyList(),  // الأنماط المدعومة (مثل "واقعي", "كرتوني")
-    val supportsVoiceCloning: Boolean = false,       // دعم استنساخ الصوت (لنماذج TTS)
+    // الحقول الأساسية
+    val category: String = "",              // فئة النموذج
+    val settingsUrl: String = "",           // رابط صفحة الإعدادات (قد يكون HuggingFace أو GitHub)
+    val readmeUrl: String = "",             // رابط README من HuggingFace
+    val supportedStyles: List<String> = emptyList(),
+    val supportsVoiceCloning: Boolean = false,
 
-    val apiEndpoint: String? = null,        // نقطة نهاية مخصصة (اختياري)
-    val parametersJson: String? = null,     // إعدادات إضافية بصيغة JSON
-    val createdAt: Long = System.currentTimeMillis()
+    // ✅ حقل جديد: رابط README من GitHub
+    val githubReadmeUrl: String? = null,    // رابط GitHub README (اختياري)
+
+    val apiEndpoint: String? = null,
+    val parametersJson: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()  // إضافة حقل للتتبع
 )
