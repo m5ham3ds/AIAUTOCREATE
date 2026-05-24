@@ -250,7 +250,7 @@ class ModelsSettingsViewModel @Inject constructor(
 
             loadModelsByCategory()
 
-            val message = if (updatedCount > 0) {
+            val message =	 if (updatedCount > 0) {
                 "✅ تم تحديث $updatedCount عنصر بنجاح"
             } else {
                 "⚠️ لم يتم تحديث أي عنصر. تأكد من اختيار نماذج في الإعدادات ومن وجود توكن HuggingFace صالح."
@@ -264,5 +264,10 @@ class ModelsSettingsViewModel @Inject constructor(
                 )
             }
         }
+    }
+}
+
+    fun clearMessages() {
+        _state.update { it.copy(saveSuccessMessage = null, errorMessage = null) }
     }
 }
