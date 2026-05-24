@@ -12,44 +12,47 @@ data class ModelConfigEntity(
     val id: Long = 0,
 
     @ColumnInfo(name = "model_id")
-    val modelId: String,                    // المعرف الفريد في HuggingFace
+    val modelId: String,
 
     @ColumnInfo(name = "model_name")
-    val modelName: String,                  // اسم العرض
+    val modelName: String,
 
     @ColumnInfo(name = "provider")
-    val provider: String,                   // "google", "huggingface"
+    val provider: String,
 
     @ColumnInfo(name = "is_enabled")
     val isEnabled: Boolean = true,
 
     @ColumnInfo(name = "description")
-    val description: String = "",           // وصف النموذج
+    val description: String = "",
 
     @ColumnInfo(name = "pipeline_tag")
-    val pipelineTag: String = "",           // تصنيف النموذج (text-generation...)
+    val pipelineTag: String = "",
 
     @ColumnInfo(name = "tags")
-    val tags: String = "",                  // وسوم النموذج (مخزنة كنص CSV)
+    val tags: String = "",                  // مخزنة كنص CSV
 
     @ColumnInfo(name = "model_url")
-    val modelUrl: String = "",              // رابط النموذج على HuggingFace
+    val modelUrl: String = "",
 
-    // ✅ الحقول الجديدة
     @ColumnInfo(name = "category")
-    val category: String = "",              // فئة النموذج
+    val category: String = "",
 
     @ColumnInfo(name = "settings_url")
-    val settingsUrl: String = "",           // رابط الإعدادات
+    val settingsUrl: String = "",
 
     @ColumnInfo(name = "readme_url")
-    val readmeUrl: String = "",             // رابط README
+    val readmeUrl: String = "",
 
     @ColumnInfo(name = "supported_styles")
-    val supportedStyles: String = "",       // الأنماط المدعومة (نص CSV)
+    val supportedStyles: String = "",       // CSV
 
     @ColumnInfo(name = "supports_voice_cloning")
     val supportsVoiceCloning: Boolean = false,
+
+    // ✅ حقل جديد: رابط GitHub README
+    @ColumnInfo(name = "github_readme_url")
+    val githubReadmeUrl: String? = null,
 
     @ColumnInfo(name = "api_endpoint")
     val apiEndpoint: String? = null,
@@ -58,5 +61,8 @@ data class ModelConfigEntity(
     val parametersJson: String? = null,
 
     @ColumnInfo(name = "created_at")
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long = System.currentTimeMillis()
 )
