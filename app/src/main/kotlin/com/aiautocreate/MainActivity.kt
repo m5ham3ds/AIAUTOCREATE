@@ -6,9 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment   // ✅ إضافة الاستيراد المفقود
 import android.provider.Settings
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -56,21 +56,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val requestManageStorageLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Environment.isExternalStorageManager()) {
-                Timber.d("تم منح صلاحية MANAGE_EXTERNAL_STORAGE")
-            } else {
-                Timber.w("لم يتم منح صلاحية MANAGE_EXTERNAL_STORAGE")
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        // ✅ Enable edge-to-edge for modern insets handling
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -101,37 +92,53 @@ class MainActivity : ComponentActivity() {
                 darkTheme = darkTheme,
                 dynamicColor = state.dynamicColor
             ) {
+                /**
+                 * ✅ FIXED: Replaced deprecated systemUiVisibility with WindowInsetsControllerCompat.
+                 * systemUiVisibility was deprecated in API 30 and unreliable on newer devices.
+                 * WindowInsetsControllerCompat provides consistent behavior across API levels.
+                 */
                 SideEffect {
                     window.statusBarColor = BackgroundMain.toArgb()
                     window.navigationBarColor = BackgroundMain.toArgb()
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        window.decorView.systemUiVisibility = if (darkTheme) {
-                            window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-                        } else {
-                            window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-                        }
-                    }
+
+                    val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+                    insetsController.isAppearanceLightStatusBars = !darkTheme
+                    insetsController.isAppearanceLightNavigationBars = !darkTheme
                 }
                 MainScreen()
             }
         }
     }
 
+    /**
+     * ✅ FIXED: Simplified permission logic. Removed MANAGE_EXTERNAL_STORAGE request
+     * and WRITE_EXTERNAL_STORAGE for Android 10+ (API 29+).
+     *
+     * Rationale:
+     * - The app uses getExternalFilesDir() (app-private storage) via AppSettingsRepository
+     * - No need for broad storage access which triggers Google Play review
+     * - Android 10+: Scoped Storage makes WRITE_EXTERNAL_STORAGE ineffective
+     * - Android 13+: Uses granular media permissions (READ_MEDIA_*)
+     */
     private fun requestPermissionsIfNeeded() {
         val permissionsToRequest = mutableListOf<String>()
 
         when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                // Android 13+: Granular media permissions
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
                 permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
                 permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
             }
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                // Android 10-12: READ only, WRITE is not needed for app-private dirs
                 permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-                permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                // ❌ REMOVED: WRITE_EXTERNAL_STORAGE - ineffective on Android 10+
+                // App uses getExternalFilesDir() which doesn't require this permission
             }
             else -> {
+                // Android 9 and below: Legacy permissions
                 permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
                 permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
@@ -144,20 +151,16 @@ class MainActivity : ComponentActivity() {
             requestMultiplePermissionsLauncher.launch(needed.toTypedArray())
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = Uri.parse("package:$packageName")
-                requestManageStorageLauncher.launch(intent)
-            }
-        }
+        // ❌ REMOVED: MANAGE_EXTERNAL_STORAGE request
+        // Not needed since app uses getExternalFilesDir() for all file operations
+        // This permission triggers special Google Play review and should be avoided
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
-	
+
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -173,7 +176,7 @@ fun MainScreen() {
                 Route.AudioReconstructor::class.qualifiedName -> "معالج الصوت الذكي"
                 Route.ModelsSettings::class.qualifiedName -> "إعدادات النماذج"
                 Route.ModelsManager::class.qualifiedName -> "مدير النماذج"
-                Route.Settings::class.qualifiedName -> "الإعدادات"
+                Route.Settings::class.qualifiedName -> "إعدادات"
                 Route.Agent::class.qualifiedName -> "الوكيل الذكي"
                 Route.VideoReimaginer::class.qualifiedName -> "تحسين جودة الفيديو"
                 Route.SimilarVideo::class.qualifiedName -> "فيديو مشابه"
