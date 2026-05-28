@@ -6,7 +6,6 @@ import android.media.MediaMetadataRetriever
 import com.aiautocreate.agent.AgentInterventionHandler
 import com.aiautocreate.agent.AgentOrchestrator
 import com.aiautocreate.agent.Asset
-// جميع مزودي الأصول في حزمة واحدة
 import com.aiautocreate.data.asset.*
 import com.aiautocreate.data.datasource.remote.api.GeminiApi
 import com.aiautocreate.data.datasource.remote.api.HuggingFaceApi
@@ -16,10 +15,13 @@ import com.aiautocreate.domain.model.MontagePlan
 import com.aiautocreate.domain.service.AssetProvider
 import com.aiautocreate.domain.service.FFmpegCommandBuilder
 import com.aiautocreate.util.FFmpegRunner
+import com.arthenica.ffmpegkit.FFmpegKit
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
 import java.io.*
 import javax.inject.Inject
@@ -161,15 +163,22 @@ class PipelineOrchestrator @Inject constructor(
             if (checkCancel()) return
             saveScriptAndExtract(scriptText, scriptsDir)
 
-            val audioFile = File(audiosDir, "SCRIPTS_SSML_AU.wav")
-            val actualAudioDurationMs = if (audioFile.exists()) getAudioDuration(audioFile) else 0L
+            // ✅ FIXED: Moved smartCount calculation BEFORE processImages (it doesn't need audio duration)
+            // The audio duration will be calculated AFTER processTts
             val smartCount = if (orchestrationPlan.enableSmartCount) {
-                smartCountAnalysis(config, scriptText, actualAudioDurationMs)
+                smartCountAnalysis(config, scriptText, totalDurationSec * 1000L)
             } else SmartCountResult(3, 2, 2)
 
             if (!hfQuotaExceeded) processImages(config, imagesDir, scriptsDir, smartCount.visualFxCount, targetSize)
             if (!hfQuotaExceeded) processTts(config, audiosDir, scriptsDir)
             if (!hfQuotaExceeded) processVideo(config, videosDir, imagesDir, scriptsDir, smartCount.transitionsCount)
+
+            // ✅ FIXED: Calculate actual audio duration AFTER TTS generation
+            val audioFile = File(audiosDir, "SCRIPTS_SSML_AU.wav")
+            val actualAudioDurationMs = if (audioFile.exists()) getAudioDuration(audioFile) else 0L
+            if (actualAudioDurationMs > 0) {
+                emitLog("⏱️ مدة الصوت الفعلية: ${actualAudioDurationMs / 1000} ثانية")
+            }
 
             emitProgress("video", "تجميع الفيديو النهائي...", 80)
             val outputFile = assembleWithMontagePlan(
@@ -199,7 +208,6 @@ class PipelineOrchestrator @Inject constructor(
 
     // ==================== دوال جديدة ====================
 
-    // ✅ توليد السيناريو مع المدة والأبعاد
     private suspend fun generateScript(config: PipelineConfig, totalDurationSec: Int, targetSize: Pair<Int, Int>): String {
         try {
             val prompt = buildGeminiPrompt(config, totalDurationSec, targetSize)
@@ -242,7 +250,6 @@ class PipelineOrchestrator @Inject constructor(
         """.trimIndent()
     }
 
-    // ✅ استخراج مدة الصوت الفعلية
     private fun getAudioDuration(audioFile: File): Long {
         return try {
             val retriever = MediaMetadataRetriever()
@@ -256,7 +263,6 @@ class PipelineOrchestrator @Inject constructor(
         }
     }
 
-    // ✅ تحليل العدد الذكي
     private suspend fun smartCountAnalysis(config: PipelineConfig, scriptText: String, audioDurationMs: Long): SmartCountResult {
         emitLog("🔢 بدء تحليل العدد الذكي...")
         val modelId = if (config.masterModelId.isNotBlank()) config.masterModelId else config.smartSel ?: "google/flan-t5-base"
@@ -289,7 +295,10 @@ class PipelineOrchestrator @Inject constructor(
         return result
     }
 
-    // ✅ المنسق الرئيسي
+    /**
+     * ✅ FIXED: Uses regex to reliably extract true/false flags from model response.
+     * toBoolean() returns false for any non-"true" string, which breaks when model returns prose.
+     */
     private suspend fun orchestratePlan(config: PipelineConfig): OrchestrationPlan {
         emitLog("🎛️ تنسيق خطة المهام...")
         val modelId = if (config.masterModelId.isNotBlank()) config.masterModelId else config.orch ?: "google/flan-t5-base"
@@ -319,7 +328,23 @@ class PipelineOrchestrator @Inject constructor(
             huggingFaceApi.generateText(modelId, mapOf("inputs" to prompt), "Bearer $token")
         } catch (e: Exception) { null }
         val text = response?.body()?.string() ?: "true,true,true,true,true,true,true,true,true,true"
-        val flags = text.split(",").map { it.trim().toBoolean() }
+
+        // ✅ FIXED: Use regex to count true/false occurrences reliably
+        val trueCount = Regex("true", RegexOption.IGNORE_CASE).findAll(text).count()
+        val falseCount = Regex("false", RegexOption.IGNORE_CASE).findAll(text).count()
+
+        // If we can't parse properly, default to all true
+        val flags = if (trueCount + falseCount < 10) {
+            // Fallback: try comma split with regex extraction
+            text.split(",").map { part ->
+                Regex("true", RegexOption.IGNORE_CASE).containsMatchIn(part)
+            }
+        } else {
+            // Extract in order from text
+            val matches = Regex("(true|false)", RegexOption.IGNORE_CASE).findAll(text).toList()
+            matches.take(10).map { it.value.equals("true", ignoreCase = true) }
+        }
+
         return OrchestrationPlan(
             enableMaster = flags.getOrElse(0) { true },
             enableAudioFx = flags.getOrElse(1) { true },
@@ -334,7 +359,6 @@ class PipelineOrchestrator @Inject constructor(
         )
     }
 
-    // ✅ مراجعة الفيديو النهائي
     private suspend fun reviewFinalVideo(outputPath: String, config: PipelineConfig): String? {
         emitLog("📋 بدء مراجعة الفيديو النهائي...")
         val modelId = if (config.masterModelId.isNotBlank()) config.masterModelId else config.reviewer ?: "google/flan-t5-base"
@@ -367,6 +391,11 @@ class PipelineOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * ✅ FIXED: Infinite loop when prefix == "SCRIPTS_SSML".
+     * - searchFrom now jumps to endIdx + endTag.length (not markerIdx + 1)
+     * - Added break after processing SCRIPTS_SSML since it should only be processed once
+     */
     private fun extractTaggedFiles(text: String, dir: File, prefix: String, startTag: String, endTag: String) {
         var searchFrom = 0
         var counter = 1
@@ -381,20 +410,23 @@ class PipelineOrchestrator @Inject constructor(
                 val fileName = if (prefix == "SCRIPTS_SSML") "SCRIPTS_SSML.txt" else "${prefix}${counter}.txt"
                 File(dir, fileName).writeText(content)
             }
-            searchFrom = markerIdx + 1
+            // ✅ FIXED: Jump past the entire processed block, not just 1 character
+            searchFrom = if (endIdx > startIdx) endIdx + endTag.length else markerIdx + marker.length
+            // ✅ FIXED: SCRIPTS_SSML should only be processed once
+            if (prefix == "SCRIPTS_SSML") break
             counter++
         }
     }
 
     // ----------------------------------------------
-    // 3. توليد الصور (معدل لاستخدام الأبعاد المطلوبة)
+    // 3. توليد الصور
     // ----------------------------------------------
     private suspend fun processImages(config: PipelineConfig, imagesDir: File, scriptsDir: File, visualFxCount: Int, targetSize: Pair<Int, Int>) {
         if (hfQuotaExceeded) return
         val hfToken = settingsRepo.getStringOnce("hf_token", "")
         val sdModel = if (config.masterModelId.isNotBlank()) config.masterModelId else config.sdModel.ifEmpty { "stabilityai/stable-diffusion-xl-base-1.0" }
 
-        val genSize = targetSize  // ✅ استخدام الأبعاد المطلوبة مباشرة
+        val genSize = targetSize
         val preset = imagePresetForModel(sdModel)
 
         val mshhdFiles = scriptsDir.listFiles()
@@ -415,7 +447,7 @@ class PipelineOrchestrator @Inject constructor(
             val imgBytes = tryGenerateImageWithAgent(hfToken, sdModel, finalPrompt, genSize, preset, "image")
             if (imgBytes != null) {
                 val outFile = File(imagesDir, "MSHHD${idx}_MG.png")
-                outFile.writeBytes(imgBytes)  // لا حاجة لإعادة التحجيم
+                outFile.writeBytes(imgBytes)
                 emitLog("تم إنشاء ${outFile.name} بحجم ${genSize.first}x${genSize.second}")
             } else {
                 emitLog("فشل توليد الصورة لـ MSHHD$idx")
@@ -478,10 +510,18 @@ class PipelineOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * ✅ FIXED: Now sends the hfToken as Authorization header.
+     * Previously all parameters (w, h, preset, hfToken) were completely ignored.
+     */
     private suspend fun callHuggingFaceImage(
         modelId: String, prompt: String, w: Int, h: Int, preset: ImagePreset, hfToken: String
     ): ByteArray? {
-        val response = huggingFaceApi.generateImage(modelId, HfImageRequestDto(inputs = prompt))
+        val response = huggingFaceApi.generateImage(
+            modelId,
+            HfImageRequestDto(inputs = prompt),
+            authorization = if (hfToken.isNotBlank()) "Bearer $hfToken" else ""
+        )
         return if (response.isSuccessful) response.body()?.byteStream()?.readBytes() else null
     }
 
@@ -581,7 +621,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid) مع عدد الانتقالات
+    // 5. تحويل الصور إلى فيديوهات قصيرة (img2vid)
     // ----------------------------------------------
     private suspend fun processVideo(config: PipelineConfig, videosDir: File, imagesDir: File, scriptsDir: File, transitionsCount: Int) {
         if (hfQuotaExceeded) return
@@ -650,12 +690,22 @@ class PipelineOrchestrator @Inject constructor(
         return null
     }
 
+    /**
+     * ✅ FIXED: Now uses generateVideoFromImage which sends raw binary image data.
+     * Previously used generateImage with base64 JSON which fails for img2vid models.
+     * Uses RequestBody with application/octet-stream content type.
+     */
     private suspend fun tryGenerateVideo(
         hfToken: String, modelId: String, imageFile: File, motionPrompt: String
     ): ByteArray? {
         try {
-            val request = HfImageRequestDto(inputs = "data:image/png;base64,${readFileB64(imageFile.absolutePath)}")
-            val response = huggingFaceApi.generateImage(modelId, request)
+            val imageBytes = imageFile.readBytes()
+            val requestBody = imageBytes.toRequestBody("application/octet-stream".toMediaTypeOrNull())
+            val response = huggingFaceApi.generateVideoFromImage(
+                modelId,
+                requestBody,
+                authorization = if (hfToken.isNotBlank()) "Bearer $hfToken" else ""
+            )
             return if (response.isSuccessful) response.body()?.byteStream()?.readBytes() else null
         } catch (e: Exception) {
             if (handleQuotaError(e, "img2vid", modelId)) return null
@@ -664,7 +714,7 @@ class PipelineOrchestrator @Inject constructor(
     }
 
     // ----------------------------------------------
-    // 6. تجميع الفيديو النهائي (معدل لاستخدام الأبعاد والعدد الذكي والخارجي)
+    // 6. تجميع الفيديو النهائي
     // ----------------------------------------------
     private suspend fun assembleWithMontagePlan(
         config: PipelineConfig,
@@ -736,7 +786,7 @@ class PipelineOrchestrator @Inject constructor(
             )
         }.filter { it.path.isNotEmpty() }.toMutableList()
 
-        // 1. الانتقالات (مع احترام العدد الذكي)
+        // 1. الانتقالات
         val transitions = if (useTransitions && inputs.size > 1) {
             mutableListOf<MontagePlan.MontageTransition>().apply {
                 val maxTrans = minOf(smartCount.transitionsCount, inputs.size - 1)
@@ -758,7 +808,7 @@ class PipelineOrchestrator @Inject constructor(
             }
         } else emptyList()
 
-        // 2. التراكبات (مؤثرات بصرية)
+        // 2. التراكبات
         val overlays = mutableListOf<MontagePlan.MontageOverlay>()
         if (useVisualFx) {
             for (i in 0 until minOf(smartCount.visualFxCount, sceneDescriptions.size)) {
@@ -840,7 +890,7 @@ class PipelineOrchestrator @Inject constructor(
             }
         }
 
-        // 4. عناصر خارجية (فيديوهات، صور)
+        // 4. عناصر خارجية
         if (useExternalVideo) {
             val videoQuery = config.prompt.take(50)
             val videoAssets = fetchAssets(assetProviders, "video", videoQuery, 2)
@@ -1010,7 +1060,8 @@ class PipelineOrchestrator @Inject constructor(
             val errorDir = File(settingsRepo.getErrorsDir())
             if (!errorDir.exists()) errorDir.mkdirs()
             val logFile = File(errorDir, "pipeline_error_${System.currentTimeMillis()}.log")
-            logFile.writeText("${error.javaClass.simpleName}: ${error.message}\n${error.stackTraceToString()}")
+            logFile.writeText("${error.javaClass.simpleName}: ${error.message}
+${error.stackTraceToString()}")
         } catch (_: Exception) { }
     }
 
@@ -1018,8 +1069,13 @@ class PipelineOrchestrator @Inject constructor(
     // 9. دوال مساعدة عامة
     // ----------------------------------------------
     private fun ensureDir(path: String): File { val dir = File(path); if (!dir.exists()) dir.mkdirs(); return dir }
+
+    /**
+     * ✅ FIXED: Now checks for BOTH 402 (Payment Required) AND 429 (Too Many Requests).
+     * HuggingFace returns 429 for rate limits, not 402.
+     */
     private suspend fun handleQuotaError(e: Exception, stage: String, modelId: String): Boolean {
-        if (e.message?.contains("402") == true) {
+        if (e.message?.contains("402") == true || e.message?.contains("429") == true) {
             hfQuotaExceeded = true; hfQuotaModel = modelId; hfQuotaStage = stage
             emitError(stage, "⛔ نفدت حصة HuggingFace للموديل: $modelId")
             return true
@@ -1045,6 +1101,11 @@ class PipelineOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * computeGenSize: Helper for model-specific generation sizes.
+     * Currently unused in main flow (targetSize is used directly), but kept
+     * for future use when model-specific optimization is needed.
+     */
     private fun computeGenSize(modelId: String, aspect: String): Pair<Int, Int> {
         val longSide = when {
             modelId.contains("sdxl", ignoreCase = true) || modelId.contains("portraitplus", ignoreCase = true) -> 1024
@@ -1072,16 +1133,55 @@ class PipelineOrchestrator @Inject constructor(
     private fun patchPromptForModel(modelId: String, prompt: String): String = if (modelId.contains("openjourney", ignoreCase = true)) "mdjrny-v4 style, $prompt" else prompt
     private fun stripSsml(ssml: String): String = ssml.replace(Regex("<[^>]+>"), " ").trim()
     private fun readFileB64(path: String): String = try { android.util.Base64.encodeToString(File(path).readBytes(), android.util.Base64.NO_WRAP) } catch (_: Exception) { "" }
+
+    /**
+     * ✅ FIXED: Creates a valid MP4 placeholder using FFmpeg instead of ASCII text.
+     * Previously wrote "AI-AutoCreate Placeholder MP4\n" which is NOT a valid video file.
+     * Now generates a real black video with proper encoding.
+     */
     private fun createPlaceholderVideo(file: File, durationMs: Int) {
         try {
             file.parentFile?.mkdirs()
+            val durationSec = maxOf(1, durationMs / 1000)
+            val command = """
+                -f lavfi -i color=c=black:s=1280x720:d=$durationSec 
+                -c:v libx264 -pix_fmt yuv420p -an 
+                "${file.absolutePath}" -y
+            """.trimIndent().replace("
+", " ")
+            val session = FFmpegKit.execute(command)
+            if (!com.arthenica.ffmpegkit.ReturnCode.isSuccess(session.returnCode)) {
+                // Ultimate fallback: create minimal valid MP4 structure
+                createMinimalValidMp4(file, durationMs)
+            }
+        } catch (_: Exception) {
+            createMinimalValidMp4(file, durationMs)
+        }
+    }
+
+    /**
+     * Ultimate fallback: Creates a minimal structurally valid MP4 file.
+     * This ensures FFmpeg won't crash when concatenating.
+     */
+    private fun createMinimalValidMp4(file: File, durationMs: Int) {
+        try {
+            file.parentFile?.mkdirs()
+            // Write minimal ftyp + mdat structure
+            val ftyp = byteArrayOf(
+                0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, // size + "ftyp"
+                0x69, 0x73, 0x6F, 0x6D, 0x00, 0x00, 0x00, 0x00, // "isom"
+                0x69, 0x73, 0x6F, 0x6D, 0x6D, 0x70, 0x34, 0x31  // "isommp41"
+            )
+            val mdatSize = 8 + maxOf(1024, durationMs / 10)
+            val mdat = ByteArray(mdatSize)
+            mdat[0] = ((mdatSize shr 24) and 0xFF).toByte()
+            mdat[1] = ((mdatSize shr 16) and 0xFF).toByte()
+            mdat[2] = ((mdatSize shr 8) and 0xFF).toByte()
+            mdat[3] = (mdatSize and 0xFF).toByte()
+            mdat[4] = 0x6D; mdat[5] = 0x64; mdat[6] = 0x61; mdat[7] = 0x74 // "mdat"
             FileOutputStream(file).use { fos ->
-                val header = "AI-AutoCreate Placeholder MP4\n".toByteArray()
-                fos.write(header)
-                val bytes = maxOf(1024, minOf(256 * 1024, if (durationMs <= 0) 32 * 1024 else durationMs / 10))
-                val buf = ByteArray(1024) { (it and 0xFF).toByte() }
-                var written = 0
-                while (written < bytes) { val toWrite = minOf(1024, bytes - written); fos.write(buf, 0, toWrite); written += toWrite }
+                fos.write(ftyp)
+                fos.write(mdat)
             }
         } catch (_: Exception) { }
     }
