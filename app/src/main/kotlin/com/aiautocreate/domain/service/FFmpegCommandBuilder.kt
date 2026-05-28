@@ -213,7 +213,7 @@ class FFmpegCommandBuilder @Inject constructor(
         }
 
         // هروب النص من الأحرف الخاصة
-        val escapedText = subtitle.text.replace("'", "\'").replace(":", "\:")
+        val escapedText = subtitle.text.replace("'", "\\'").replace(":", "\\:")
 
         // ✅ FIXED: Use assets/fonts/ directory with fallback
         val fontFile = if (subtitle.fontFamily != "default" && subtitle.fontFamily.isNotBlank()) {
