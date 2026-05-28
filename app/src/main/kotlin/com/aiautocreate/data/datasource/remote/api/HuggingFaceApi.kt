@@ -13,8 +13,8 @@ import retrofit2.http.*
  * HuggingFace Inference API Interface
  *
  * Fixes applied:
- * 1. imageToText: ByteArray? -> RequestBody (Retrofit requires RequestBody for raw binary)
- * 2. Added generateVideoFromImage: Dedicated endpoint for img2vid models requiring raw binary
+ * 1. imageToText: ByteArray changed to RequestBody (Retrofit requires RequestBody for raw binary)
+ * 2. Added generateVideoFromImage: Dedicated endpoint for img2vid models requiring binary image upload
  * 3. Added generateVideoFromImageMultipart: Alternative multipart upload for video generation
  * 4. All endpoints properly support Authorization header injection
  */
@@ -55,9 +55,9 @@ interface HuggingFaceApi {
     // ================== VISION / IMAGE-TO-TEXT ==================
 
     /**
-     * FIXED: ByteArray? -> RequestBody
+     * FIXED: ByteArray changed to RequestBody
      * Retrofit does NOT support nullable ByteArray as @Body directly.
-     * Use RequestBody.create(MediaType.parse("image/*"), byteArray) when calling.
+     * Use RequestBody.create(MediaType.parse("image/jpeg"), byteArray) when calling.
      */
     @POST("models/{model}")
     suspend fun imageToText(
