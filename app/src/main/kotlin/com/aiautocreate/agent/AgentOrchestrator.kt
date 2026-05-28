@@ -6,9 +6,7 @@ import com.aiautocreate.data.repository.AppSettingsRepository
 import com.aiautocreate.domain.model.ModelConfig
 import com.aiautocreate.domain.repository.IModelsRepository
 import com.aiautocreate.domain.repository.ISettingsRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
@@ -19,6 +17,11 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * ✅ FIXED: All infinite loops now have retry counters.
+ * ✅ FIXED: Unmanaged CoroutineScope replaced with proper coroutine usage.
+ * ✅ FIXED: executeGeminiRequest and executeHuggingFaceRequest have max retry limits.
+ */
 @Singleton
 class AgentOrchestrator @Inject constructor(
     private val geminiApi: GeminiApi,
@@ -35,12 +38,19 @@ class AgentOrchestrator @Inject constructor(
 
     private var maxInterventionDepth: Int = 3
 
-    init {
-        CoroutineScope(Dispatchers.IO).launch {
-            maxInterventionDepth = appSettingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
-            geminiKeyManager.refreshKeys()
-            tokenManager.refreshTokens()
-        }
+    /**
+     * ✅ FIXED: Removed unmanaged CoroutineScope(Dispatchers.IO).launch in init.
+     * Initialization is now done lazily on first access or via explicit suspend init().
+     * This prevents memory leaks and gives caller control over lifecycle.
+     */
+    private var initialized = false
+
+    suspend fun initialize() {
+        if (initialized) return
+        maxInterventionDepth = appSettingsRepo.getStringOnce("agent_depth", "3").toIntOrNull() ?: 3
+        geminiKeyManager.refreshKeys()
+        tokenManager.refreshTokens()
+        initialized = true
     }
 
     suspend fun updateMaxDepth(depth: Int) {
@@ -48,7 +58,10 @@ class AgentOrchestrator @Inject constructor(
         appSettingsRepo.setString("agent_depth", depth.toString())
     }
 
-    suspend fun getCurrentMaxDepth(): Int = maxInterventionDepth
+    suspend fun getCurrentMaxDepth(): Int {
+        if (!initialized) initialize()
+        return maxInterventionDepth
+    }
 
     suspend fun suggestAlternativeModel(
         category: String,
@@ -81,7 +94,8 @@ class AgentOrchestrator @Inject constructor(
             المشهد السابق: ${prevScene.take(200)}
             المشهد الحالي: ${nextScene.take(200)}
             أنواع الانتقالات المتاحة:
-            ${candidates.joinToString("\n") { "- ${it.name} (${it.command})" }}
+            ${candidates.joinToString("
+") { "- ${it.name} (${it.command})" }}
             أي انتقال هو الأنسب للانتقال من المشهد السابق إلى الحالي؟
             أجب فقط بـ "id" للانتقال كما هو مكتوب في القائمة، ولا تكتب أي شيء آخر.
         """.trimIndent()
@@ -90,14 +104,16 @@ class AgentOrchestrator @Inject constructor(
     }
 
     suspend fun suggestMusic(overallTheme: String, sceneDescriptions: List<String>, candidates: List<Asset>): Asset? {
-        val scenesSummary = sceneDescriptions.take(3).joinToString("\n") { "- $it" }
+        val scenesSummary = sceneDescriptions.take(3).joinToString("
+") { "- $it" }
         val prompt = """
             أنت خبير اختيار موسيقى خلفية للأفلام.
             موضوع الفيديو العام: ${overallTheme.take(150)}
             وصف أول 3 مشاهد:
             $scenesSummary
             قائمة الموسيقى المتاحة:
-            ${candidates.joinToString("\n") { "- ${it.name}" }}
+            ${candidates.joinToString("
+") { "- ${it.name}" }}
             أي قطعة موسيقية هي الأنسب كخلفية لهذا الفيديو؟
             أجب فقط بـ "id" للموسيقى كما هو مكتوب في القائمة، ولا تكتب أي شيء آخر.
         """.trimIndent()
@@ -110,7 +126,8 @@ class AgentOrchestrator @Inject constructor(
             أنت خبير مؤثرات صوتية للأفلام.
             وصف المشهد: ${sceneDescription.take(200)}
             قائمة المؤثرات الصوتية المتاحة:
-            ${candidates.joinToString("\n") { "- ${it.name}" }}
+            ${candidates.joinToString("
+") { "- ${it.name}" }}
             حدد أي المؤثرات الصوتية (قد تكون صفر أو واحد أو أكثر) تناسب هذا المشهد.
             أجب بقائمة مفصولة بفواصل تحتوي على "id" لكل مؤثر مناسب، مثال: "sfx1,sfx3"
             إذا لم يكن أي مناسب، أجب بـ "none".
@@ -127,6 +144,7 @@ class AgentOrchestrator @Inject constructor(
 
     // ==================== دوال الرد الرئيسية (مع دعم عدة نماذج) ====================
     suspend fun getContextualAnswer(question: String, requestedModelId: String? = null): String {
+        if (!initialized) initialize()
         val context = contextProvider.getQuickContext()
         val defaultModelId = appSettingsRepo.getDefaultAgentModelId()
         var currentModelId = requestedModelId ?: getCurrentModelId(defaultModelId)
@@ -171,9 +189,16 @@ class AgentOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * ✅ FIXED: Added retry counter to prevent infinite loops on non-429 errors.
+     * Max 3 retries per key, then moves to next key.
+     */
     private suspend fun executeGeminiRequest(context: String, question: String): String? {
         var attempts = 0
         val maxAttempts = geminiKeyManager.getAllKeys().size.coerceAtLeast(1)
+        var retryCount = 0
+        val maxRetries = 3
+
         while (attempts < maxAttempts) {
             val apiKey = geminiKeyManager.getCurrentKey()
             if (apiKey.isNullOrBlank()) return null
@@ -204,24 +229,45 @@ class AgentOrchestrator @Inject constructor(
                     if (code == 429) {
                         geminiKeyManager.markRateLimitAndGetNext()
                         attempts++
+                        retryCount = 0
                         continue
                     } else {
-                        // أي خطأ آخر (مهلة، 500...) نعيد المحاولة بنفس المفتاح بعد تأخير بسيط
+                        // ✅ FIXED: Limit retries for non-429 errors
+                        if (++retryCount >= maxRetries) {
+                            geminiKeyManager.markFailureAndGetNext()
+                            attempts++
+                            retryCount = 0
+                            continue
+                        }
                         delay(1000)
                         continue
                     }
                 }
             } catch (e: Exception) {
+                // ✅ FIXED: Limit retries for exceptions too
+                if (++retryCount >= maxRetries) {
+                    geminiKeyManager.markFailureAndGetNext()
+                    attempts++
+                    retryCount = 0
+                    continue
+                }
                 delay(1000)
             }
         }
         return null
     }
 
+    /**
+     * ✅ FIXED: Added retry counter to prevent infinite loops on non-429 errors.
+     * Max 3 retries per token, then moves to next token.
+     */
     private suspend fun executeHuggingFaceRequest(modelId: String, context: String, question: String): String? {
         var currentToken = tokenManager.getTokenForModel(modelId)
         var attempts = 0
         val maxAttempts = tokenManager.getAllTokens().size.coerceAtLeast(1)
+        var retryCount = 0
+        val maxRetries = 3
+
         while (attempts < maxAttempts && currentToken != null) {
             val fullPrompt = """
                 أنت مساعد ذكي. السياق: $context
@@ -250,14 +296,28 @@ class AgentOrchestrator @Inject constructor(
                         tokenManager.markRateLimit(modelId, currentToken)
                         currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
                         attempts++
+                        retryCount = 0
                         continue
                     } else {
-                        // أخطاء مؤقتة نعيد المحاولة بنفس التوكن
+                        // ✅ FIXED: Limit retries for non-429 errors
+                        if (++retryCount >= maxRetries) {
+                            currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                            attempts++
+                            retryCount = 0
+                            continue
+                        }
                         delay(1000)
                         continue
                     }
                 }
             } catch (e: Exception) {
+                // ✅ FIXED: Limit retries for exceptions too
+                if (++retryCount >= maxRetries) {
+                    currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                    attempts++
+                    retryCount = 0
+                    continue
+                }
                 delay(1000)
             }
         }
@@ -266,6 +326,7 @@ class AgentOrchestrator @Inject constructor(
 
     // ==================== دوال التحليلات المتخصصة ====================
     suspend fun quickScan(): String {
+        if (!initialized) initialize()
         val context = contextProvider.getQuickContext()
         val defaultModelId = appSettingsRepo.getDefaultAgentModelId()
         val result = executeModelRequest(defaultModelId, context, "قم بتحليل سريع لحالة التطبيق: $context. قدم ملخصاً مختصراً (سطرين كحد أقصى).")
@@ -273,6 +334,7 @@ class AgentOrchestrator @Inject constructor(
     }
 
     suspend fun fullAnalysis(): String {
+        if (!initialized) initialize()
         val context = contextProvider.getFullContext()
         val defaultModelId = appSettingsRepo.getDefaultAgentModelId()
         val prompt = """
@@ -289,6 +351,7 @@ class AgentOrchestrator @Inject constructor(
     }
 
     suspend fun criticalErrorsCheck(): String {
+        if (!initialized) initialize()
         val context = contextProvider.getErrorContext()
         val defaultModelId = appSettingsRepo.getDefaultAgentModelId()
         val prompt = """
@@ -305,8 +368,12 @@ class AgentOrchestrator @Inject constructor(
 
     // ==================== دوال مساعدة ====================
     private suspend fun askGeminiForSuggestion(prompt: String): String? {
+        if (!initialized) initialize()
         var attempts = 0
         val maxAttempts = geminiKeyManager.getAllKeys().size.coerceAtLeast(1)
+        var retryCount = 0
+        val maxRetries = 3
+
         while (attempts < maxAttempts) {
             val apiKey = geminiKeyManager.getCurrentKey()
             if (apiKey.isNullOrBlank()) return null
@@ -330,11 +397,25 @@ class AgentOrchestrator @Inject constructor(
                     if (code == 429) {
                         geminiKeyManager.markRateLimitAndGetNext()
                         attempts++
+                        retryCount = 0
                         continue
-                    } else return null
+                    } else {
+                        if (++retryCount >= maxRetries) {
+                            geminiKeyManager.markFailureAndGetNext()
+                            attempts++
+                            retryCount = 0
+                            continue
+                        }
+                        return null
+                    }
                 }
             } catch (e: Exception) {
-                geminiKeyManager.markFailureAndGetNext()
+                if (++retryCount >= maxRetries) {
+                    geminiKeyManager.markFailureAndGetNext()
+                    attempts++
+                    retryCount = 0
+                    continue
+                }
                 attempts++
             }
         }
@@ -342,7 +423,8 @@ class AgentOrchestrator @Inject constructor(
     }
 
     private fun buildGeminiPrompt(category: String, failedModelId: String, errorMessage: String, candidates: List<ModelConfig>): String {
-        val candidatesList = candidates.joinToString("\n") { "- ${it.modelId} (${it.modelName}): ${it.description.take(100)}" }
+        val candidatesList = candidates.joinToString("
+") { "- ${it.modelId} (${it.modelName}): ${it.description.take(100)}" }
         return """
             أنت مساعد خبير في نماذج الذكاء الاصطناعي.
             الفئة: $category
