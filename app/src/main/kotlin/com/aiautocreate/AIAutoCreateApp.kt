@@ -6,10 +6,19 @@ import com.aiautocreate.data.datasource.local.secure.ApiKeyMigration
 import com.aiautocreate.domain.usecase.model.DefaultModelsInitializer
 import com.aiautocreate.worker.BackgroundStyleRefresher
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+/**
+ * ✅ FIXED: I/O operations (DataStore migrations) now run on Dispatchers.IO
+ * instead of the main thread. Uses application-scoped CoroutineScope with
+ * SupervisorJob for proper lifecycle management.
+ */
 @HiltAndroidApp
 class AIAutoCreateApp : Application() {
 
@@ -19,6 +28,12 @@ class AIAutoCreateApp : Application() {
     @Inject
     lateinit var defaultModelsInitializer: DefaultModelsInitializer
 
+    /**
+     * ✅ FIXED: Properly managed CoroutineScope for application-level coroutines.
+     * SupervisorJob ensures child coroutine failures don't cancel siblings.
+     */
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -27,11 +42,15 @@ class AIAutoCreateApp : Application() {
             Timber.plant(Timber.DebugTree())
         }
 
-        // ترحيل مفاتيح API إلى التخزين الآمن
-        apiKeyMigration.migrateIfNeeded()
+        // ✅ FIXED: Run DataStore I/O operations on IO dispatcher
+        // Previously ran on main thread which could cause ANR on first launch
+        applicationScope.launch {
+            // ترحيل مفاتيح API إلى التخزين الآمن
+            apiKeyMigration.migrateIfNeeded()
 
-        // تهيئة النماذج الافتراضية (تضاف مرة واحدة فقط عند أول تشغيل)
-        defaultModelsInitializer.initializeIfNeeded()
+            // تهيئة النماذج الافتراضية (تضاف مرة واحدة فقط عند أول تشغيل)
+            defaultModelsInitializer.initializeIfNeeded()
+        }
 
         // ✅ جدولة تحديث الأنماط من README في الخلفية
         scheduleStyleRefresher()
@@ -57,6 +76,12 @@ class AIAutoCreateApp : Application() {
     }
 
     companion object {
+        /**
+         * ⚠️ DEPRECATED: Use proper Dependency Injection instead.
+         * This is kept for backward compatibility but new code should
+         * inject @ApplicationContext via Hilt.
+         */
+        @Deprecated("Use @ApplicationContext injection via Hilt instead")
         lateinit var instance: AIAutoCreateApp
             private set
     }
