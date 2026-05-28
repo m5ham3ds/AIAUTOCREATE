@@ -1,9 +1,10 @@
 package com.aiautocreate.data.repository
 
+import android.content.Context
 import android.util.Base64
 import androidx.datastore.preferences.core.*
-import com.aiautocreate.AIAutoCreateApp
 import com.aiautocreate.data.datasource.local.datastore.DataStoreManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -11,10 +12,17 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * ✅ FIXED: Replaced AIAutoCreateApp.instance with proper @ApplicationContext injection.
+ * This follows Dependency Injection principles and eliminates the anti-pattern
+ * of accessing Application singleton directly from repository layer.
+ */
 @Singleton
 class AppSettingsRepository @Inject constructor(
-    private val dataStore: DataStoreManager
+    private val dataStore: DataStoreManager,
+    @ApplicationContext private val context: Context  // ✅ Injected properly via Hilt
 ) {
+
     // ================== مفاتيح API ==================
     val geminiKey: Flow<String> = dataStore.getStringFlow("gemini_key", "")
     val geminiUrl: Flow<String> = dataStore.getStringFlow("gemini_url", "")
@@ -145,8 +153,11 @@ class AppSettingsRepository @Inject constructor(
     }
 
     // ✅ دوال المسارات الجديدة (باستخدام المجلد الخاص بالتطبيق)
+    /**
+     * ✅ FIXED: Uses injected @ApplicationContext instead of AIAutoCreateApp.instance.
+     * This is testable, follows DI principles, and avoids memory leak risks.
+     */
     private fun getAppRoot(): String {
-        val context = AIAutoCreateApp.instance
         return context.getExternalFilesDir(null)?.absolutePath ?: context.filesDir.absolutePath
     }
 
