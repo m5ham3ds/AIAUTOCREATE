@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- ✅ Core permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- صلاحيات التخزين للأجهزة القديمة (Android 9-10) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+
+    <!-- ✅ Storage permissions for legacy devices (Android 9 and below) -->
+    <uses-permission 
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    
-    <!-- صلاحيات التخزين الدقيقة للأجهزة الحديثة (Android 13+) -->
+    <uses-permission 
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <!-- ✅ FIXED: maxSdkVersion reduced from 32 to 28
+         WRITE_EXTERNAL_STORAGE is ineffective on Android 10+ (API 29+)
+         because the app uses getExternalFilesDir() (app-private storage)
+         which doesn't require any permission.
+    -->
+
+    <!-- ✅ Granular media permissions for Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
