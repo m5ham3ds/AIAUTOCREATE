@@ -94,8 +94,7 @@ class AgentOrchestrator @Inject constructor(
             المشهد السابق: ${prevScene.take(200)}
             المشهد الحالي: ${nextScene.take(200)}
             أنواع الانتقالات المتاحة:
-            ${candidates.joinToString("
-") { "- ${it.name} (${it.command})" }}
+            ${candidates.joinToString("\n") { "- ${it.name} (${it.command})" }}
             أي انتقال هو الأنسب للانتقال من المشهد السابق إلى الحالي؟
             أجب فقط بـ "id" للانتقال كما هو مكتوب في القائمة، ولا تكتب أي شيء آخر.
         """.trimIndent()
@@ -104,16 +103,14 @@ class AgentOrchestrator @Inject constructor(
     }
 
     suspend fun suggestMusic(overallTheme: String, sceneDescriptions: List<String>, candidates: List<Asset>): Asset? {
-        val scenesSummary = sceneDescriptions.take(3).joinToString("
-") { "- $it" }
+        val scenesSummary = sceneDescriptions.take(3).joinToString("\n") { "- $it" }
         val prompt = """
             أنت خبير اختيار موسيقى خلفية للأفلام.
             موضوع الفيديو العام: ${overallTheme.take(150)}
             وصف أول 3 مشاهد:
             $scenesSummary
             قائمة الموسيقى المتاحة:
-            ${candidates.joinToString("
-") { "- ${it.name}" }}
+            ${candidates.joinToString("\n") { "- ${it.name}" }}
             أي قطعة موسيقية هي الأنسب كخلفية لهذا الفيديو؟
             أجب فقط بـ "id" للموسيقى كما هو مكتوب في القائمة، ولا تكتب أي شيء آخر.
         """.trimIndent()
@@ -126,8 +123,7 @@ class AgentOrchestrator @Inject constructor(
             أنت خبير مؤثرات صوتية للأفلام.
             وصف المشهد: ${sceneDescription.take(200)}
             قائمة المؤثرات الصوتية المتاحة:
-            ${candidates.joinToString("
-") { "- ${it.name}" }}
+            ${candidates.joinToString("\n") { "- ${it.name}" }}
             حدد أي المؤثرات الصوتية (قد تكون صفر أو واحد أو أكثر) تناسب هذا المشهد.
             أجب بقائمة مفصولة بفواصل تحتوي على "id" لكل مؤثر مناسب، مثال: "sfx1,sfx3"
             إذا لم يكن أي مناسب، أجب بـ "none".
@@ -423,8 +419,7 @@ class AgentOrchestrator @Inject constructor(
     }
 
     private fun buildGeminiPrompt(category: String, failedModelId: String, errorMessage: String, candidates: List<ModelConfig>): String {
-        val candidatesList = candidates.joinToString("
-") { "- ${it.modelId} (${it.modelName}): ${it.description.take(100)}" }
+        val candidatesList = candidates.joinToString("\n") { "- ${it.modelId} (${it.modelName}): ${it.description.take(100)}" }
         return """
             أنت مساعد خبير في نماذج الذكاء الاصطناعي.
             الفئة: $category
