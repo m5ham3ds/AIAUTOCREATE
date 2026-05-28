@@ -24,14 +24,14 @@ class FFmpegCommandBuilder @Inject constructor(
         // 1. إدخال الملفات
         plan.inputFiles.forEach { input ->
             when (input.type) {
-                "video" -> sb.append("-i "${input.path}" ")
-                "image" -> sb.append("-loop 1 -t ${input.durationMs / 1000} -i "${input.path}" ")
+                "video" -> sb.append("-i \"${input.path}\" ")
+                "image" -> sb.append("-loop 1 -t ${input.durationMs / 1000} -i \"${input.path}\" ")
             }
         }
 
         // 2. إدخال الصوت
         plan.audioTracks.forEach { audio ->
-            sb.append("-i "${audio.path}" ")
+            sb.append("-i \"${audio.path}\" ")
         }
 
         // 3. بناء filter_complex
@@ -139,15 +139,15 @@ class FFmpegCommandBuilder @Inject constructor(
         }
 
         if (allFilters.isNotEmpty()) {
-            sb.append("-filter_complex "")
+            sb.append("-filter_complex \"")
             sb.append(allFilters.joinToString(";"))
-            sb.append("" ")
+            sb.append("\" ")
         }
 
         // خريطة الإخراج
-        sb.append("-map "$finalVideoLabel" ")
+        sb.append("-map \"$finalVideoLabel\" ")
         if (audioFilters.isNotEmpty()) {
-            sb.append("-map "[a_out]" ")
+            sb.append("-map \"[a_out]\" ")
         }
 
         // إعدادات التصدير
@@ -159,7 +159,7 @@ class FFmpegCommandBuilder @Inject constructor(
         sb.append("-movflags +faststart ") // ✅ NEW: Enable fast start for web playback
 
         // مسار المخرج
-        sb.append(""${plan.outputSettings.outputPath}" -y")
+        sb.append("\"${plan.outputSettings.outputPath}\" -y")
 
         return sb.toString().trim()
     }
