@@ -11,10 +11,10 @@ import retrofit2.http.*
 
 /**
  * HuggingFace Inference API Interface
- * 
+ *
  * Fixes applied:
- * 1. imageToText: ByteArray? → RequestBody (Retrofit requires RequestBody for raw binary)
- * 2. Added generateVideoFromImage: Dedicated endpoint for img2vid models requiring binary image upload
+ * 1. imageToText: ByteArray? -> RequestBody (Retrofit requires RequestBody for raw binary)
+ * 2. Added generateVideoFromImage: Dedicated endpoint for img2vid models requiring raw binary
  * 3. Added generateVideoFromImageMultipart: Alternative multipart upload for video generation
  * 4. All endpoints properly support Authorization header injection
  */
@@ -55,7 +55,7 @@ interface HuggingFaceApi {
     // ================== VISION / IMAGE-TO-TEXT ==================
 
     /**
-     * ✅ FIXED: ByteArray? → RequestBody
+     * FIXED: ByteArray? -> RequestBody
      * Retrofit does NOT support nullable ByteArray as @Body directly.
      * Use RequestBody.create(MediaType.parse("image/*"), byteArray) when calling.
      */
@@ -69,7 +69,7 @@ interface HuggingFaceApi {
     // ================== VIDEO GENERATION (IMG2VID) ==================
 
     /**
-     * ✅ NEW: Dedicated video generation endpoint for img2vid models.
+     * NEW: Dedicated video generation endpoint for img2vid models.
      * Models like stable-video-diffusion-img2vid require raw binary image in body,
      * NOT base64 JSON payload. Sends image as application/octet-stream.
      */
@@ -82,7 +82,7 @@ interface HuggingFaceApi {
     ): Response<ResponseBody>
 
     /**
-     * ✅ NEW: Multipart alternative for video generation (fallback).
+     * NEW: Multipart alternative for video generation (fallback).
      * Some HF Spaces/img2vid endpoints accept multipart/form-data with image file.
      */
     @Multipart
