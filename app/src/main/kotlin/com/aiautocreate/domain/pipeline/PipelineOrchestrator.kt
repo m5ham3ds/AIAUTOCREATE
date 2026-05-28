@@ -1060,8 +1060,7 @@ class PipelineOrchestrator @Inject constructor(
             val errorDir = File(settingsRepo.getErrorsDir())
             if (!errorDir.exists()) errorDir.mkdirs()
             val logFile = File(errorDir, "pipeline_error_${System.currentTimeMillis()}.log")
-            logFile.writeText("${error.javaClass.simpleName}: ${error.message}
-${error.stackTraceToString()}")
+            logFile.writeText("${error.javaClass.simpleName}: ${error.message}\n${error.stackTraceToString()}")
         } catch (_: Exception) { }
     }
 
@@ -1144,11 +1143,10 @@ ${error.stackTraceToString()}")
             file.parentFile?.mkdirs()
             val durationSec = maxOf(1, durationMs / 1000)
             val command = """
-                -f lavfi -i color=c=black:s=1280x720:d=$durationSec 
-                -c:v libx264 -pix_fmt yuv420p -an 
+                -f lavfi -i color=c=black:s=1280x720:d=$durationSec
+                -c:v libx264 -pix_fmt yuv420p -an
                 "${file.absolutePath}" -y
-            """.trimIndent().replace("
-", " ")
+            """.trimIndent().replace("\n", " ")
             val session = FFmpegKit.execute(command)
             if (!com.arthenica.ffmpegkit.ReturnCode.isSuccess(session.returnCode)) {
                 // Ultimate fallback: create minimal valid MP4 structure
