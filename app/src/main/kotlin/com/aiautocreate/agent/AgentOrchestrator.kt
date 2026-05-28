@@ -265,6 +265,7 @@ class AgentOrchestrator @Inject constructor(
         val maxRetries = 3
 
         while (attempts < maxAttempts && currentToken != null) {
+            val token = currentToken!! // ✅ FIX: Explicit non-null for var smart-cast
             val fullPrompt = """
                 أنت مساعد ذكي. السياق: $context
                 سؤال: $question
@@ -280,24 +281,24 @@ class AgentOrchestrator @Inject constructor(
             )
             try {
                 val response = withTimeoutOrNull(30000L) {
-                    huggingFaceApi.generateText(modelId, request, "Bearer $currentToken")
+                    huggingFaceApi.generateText(modelId, request, "Bearer $token")
                 }
                 if (response?.isSuccessful == true) {
-                    tokenManager.markSuccess(modelId, currentToken)
+                    tokenManager.markSuccess(modelId, token)
                     val body = response.body()?.string()
                     return body ?: "لا يوجد رد."
                 } else {
                     val code = response?.code()
                     if (code == 429) {
-                        tokenManager.markRateLimit(modelId, currentToken)
-                        currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                        tokenManager.markRateLimit(modelId, token)
+                        currentToken = tokenManager.getNextTokenForModel(modelId, token)
                         attempts++
                         retryCount = 0
                         continue
                     } else {
                         // ✅ FIXED: Limit retries for non-429 errors
                         if (++retryCount >= maxRetries) {
-                            currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                            currentToken = tokenManager.getNextTokenForModel(modelId, token)
                             attempts++
                             retryCount = 0
                             continue
@@ -309,7 +310,7 @@ class AgentOrchestrator @Inject constructor(
             } catch (e: Exception) {
                 // ✅ FIXED: Limit retries for exceptions too
                 if (++retryCount >= maxRetries) {
-                    currentToken = tokenManager.getNextTokenForModel(modelId, currentToken)
+                    currentToken = tokenManager.getNextTokenForModel(modelId, token)
                     attempts++
                     retryCount = 0
                     continue
